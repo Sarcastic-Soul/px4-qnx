@@ -1,0 +1,105 @@
+logger_sd_fsync_mission: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+logger_sd_write_mission: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+logger_sd_fsync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+logger_sd_write: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: STATUSTEXT missed messages: 0 events
+mavlink: forwarding error: 0 events
+mavlink: send_bytes error: 0 events
+mavlink: tx run interval: 18569 events, 1621.90us avg, min 1510us max 1978us 46.470us rms
+mavlink: tx run elapsed: 18569 events, 182352us elapsed, 9.82us avg, min 2us max 213us 15.527us rms
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: listing: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: create file: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: STATUSTEXT missed messages: 0 events
+mavlink: forwarding error: 0 events
+mavlink: send_bytes error: 0 events
+mavlink: tx run interval: 18570 events, 1621.81us avg, min 1509us max 2020us 48.924us rms
+mavlink: tx run elapsed: 18570 events, 41264us elapsed, 2.22us avg, min 1us max 118us 5.940us rms
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: listing: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: create file: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: STATUSTEXT missed messages: 0 events
+mavlink: forwarding error: 0 events
+mavlink: send_bytes error: 0 events
+mavlink: tx run interval: 11515 events, 2615.61us avg, min 2513us max 3121us 44.965us rms
+mavlink: tx run elapsed: 11515 events, 97335us elapsed, 8.45us avg, min 1us max 412us 20.210us rms
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: listing: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: create file: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: STATUSTEXT missed messages: 0 events
+mavlink: forwarding error: 0 events
+mavlink: send_bytes error: 0 events
+mavlink: tx run interval: 18562 events, 1622.52us avg, min 1510us max 2391us 53.407us rms
+mavlink: tx run elapsed: 18562 events, 365431us elapsed, 19.69us avg, min 1us max 799us 44.790us rms
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: listing: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: create file: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: STATUSTEXT missed messages: 0 events
+mavlink: forwarding error: 0 events
+mavlink: send_bytes error: 0 events
+mavlink: tx run interval: 18562 events, 1622.60us avg, min 1513us max 2241us 51.480us rms
+mavlink: tx run elapsed: 18562 events, 312467us elapsed, 16.83us avg, min 1us max 678us 43.477us rms
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: listing: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mavlink: create file: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+gyro_calibration: calibration updated: 0 events
+gyro_calibration: interval: 1506 events, 19986.72us avg, min 19868us max 20164us 12.161us rms
+gyro_fft: gyro data gap: 0 events
+gyro_fft: FFT: 566 events, 4496us elapsed, 7.94us avg, min 4us max 25us 2.972us rms
+gyro_fft: cycle interval: 6024 events, 4999.16us avg, min 4682us max 5322us 50.236us rms
+gyro_fft: cycle: 6024 events, 42954us elapsed, 7.13us avg, min 1us max 146us 15.930us rms
+mission_dm_cache_miss: 0 events
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+rtl_dm_cache_miss_land: 0 events
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+rtl_dm_cache_miss_geo: 0 events
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mission_dm_cache_miss: 0 events
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+geofence_dm_cache_miss: 0 events
+DatamanClient: sync: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+navigator: 637 events, 5268us elapsed, 8.27us avg, min 2us max 77us 7.168us rms
+land_detector: cycle: 2677 events, 8720us elapsed, 3.26us avg, min 1us max 135us 5.168us rms
+mc_pos_control: cycle time: 2677 events, 15800us elapsed, 5.90us avg, min 1us max 59us 6.624us rms
+flight_mode_manager: cycle: 1505 events, 15745us elapsed, 10.46us avg, min 2us max 71us 10.417us rms
+mc_hover_thrust_estimator: cycle time: 2677 events, 552us elapsed, 0.21us avg, min 0us max 7us 0.457us rms
+mc_autotune_attitude_control: cycle time: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+mc_att_control: cycle: 8032 events, 81586us elapsed, 10.16us avg, min 1us max 137us 8.105us rms
+mc_rate_control: interval: 24096 events, 1249.95us avg, min 924us max 1626us 80.451us rms
+mc_rate_control: cycle: 24096 events, 31942us elapsed, 1.33us avg, min 1us max 32us 0.974us rms
+control_allocator: cycle: 24096 events, 57415us elapsed, 2.38us avg, min 1us max 166us 3.519us rms
+pwm_out_sim: interval: 0 events, 0.00us avg, min 0us max 0us 0.000us rms
+pwm_out_sim: cycle: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+control latency: 24096 events, 504107us elapsed, 20.92us avg, min 6us max 224us 13.169us rms
+ekf2: IMU message missed: 0 events
+ekf2: EKF update: 2677 events, 49019us elapsed, 18.31us avg, min 4us max 104us 10.440us rms
+commander: preflight check: 298 events, 7935us elapsed, 26.63us avg, min 16us max 123us 13.242us rms
+commander: cycle: 2977 events, 30899us elapsed, 10.38us avg, min 1us max 149us 11.810us rms
+vehicle_imu: gyro data gap: 0 events
+vehicle_imu: accel data gap: 0 events
+vehicle_magnetometer: cycle: 1506 events, 14483us elapsed, 9.62us avg, min 1us max 64us 7.324us rms
+vehicle_gps_position: cycle: 241 events, 2237us elapsed, 9.28us avg, min 1us max 167us 15.270us rms
+vehicle_air_data: cycle: 697 events, 6706us elapsed, 9.62us avg, min 1us max 53us 8.543us rms
+vehicle_angular_velocity: gyro selection changed: 0 events
+vehicle_angular_velocity: gyro filter reset: 0 events
+vehicle_angular_velocity: gyro filter: 24096 events, 75059us elapsed, 3.11us avg, min 1us max 171us 6.157us rms
+sensors: 8032 events, 82447us elapsed, 10.26us avg, min 1us max 150us 8.307us rms
+manual_control: interval: 150 events, 198783.39us avg, min 200008us max 200249us 48.611us rms
+manual_control: cycle: 150 events, 372us elapsed, 2.48us avg, min 1us max 31us 3.604us rms
+rc_update: valid data interval: 0 events, 0.00us avg, min 0us max 0us 0.000us rms
+rc_update: cycle interval: 0 events, 0.00us avg, min 0us max 0us 0.000us rms
+rc_update: cycle: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+system_power_simulator: cycle: 3012 events, 1284us elapsed, 0.43us avg, min 1us max 14us 0.646us rms
+battery_simulator: cycle: 3012 events, 3660us elapsed, 1.22us avg, min 1us max 11us 1.040us rms
+load_mon: cycle: 61 events, 2922us elapsed, 47.90us avg, min 22us max 96us 16.081us rms
+sensor_mag_sim: cycle: 1506 events, 26005us elapsed, 17.27us avg, min 2us max 90us 10.169us rms
+sensor_gps_sim: cycle: 241 events, 3754us elapsed, 15.58us avg, min 2us max 73us 10.421us rms
+sensor_baro_sim: cycle: 603 events, 10761us elapsed, 17.85us avg, min 1us max 63us 10.592us rms
+simulator_sih: cycle interval: 0 events, 0.00us avg, min 0us max 0us 0.000us rms
+simulator_sih: cycle: 24096 events, 287521us elapsed, 11.93us avg, min 2us max 189us 11.654us rms
+dataman: write: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+dataman: read: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+param: set: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms
+param: get: 1490 events
+param: find: 2384 events
+param: export: 0 events, 0us elapsed, 0.00us avg, min 0us max 0us 0.000us rms

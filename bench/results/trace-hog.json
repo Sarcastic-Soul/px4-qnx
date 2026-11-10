@@ -1,0 +1,1 @@
+{"label": "hog", "trace_s": 2.0, "runs": 1683, "runs_per_s": 841.6, "ready_to_running_pairs": 1683, "median_us": 2.66, "p99_us": 6.21, "max_us": 16.45}

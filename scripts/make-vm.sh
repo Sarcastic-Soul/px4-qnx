@@ -10,11 +10,22 @@ SSH_PUB="${SSH_PUB:-$HOME/.ssh/id_ed25519_qnx.pub}"
 # Extra MB for /data: PX4 binary (~10 MB stripped), ROMFS, params, dataman, logs.
 DATA_SIZE_MB="${DATA_SIZE_MB:-1024}"
 
+# Kernel tick in Hz (procnto -C). QNX 8.0 is tickless, but normal timers
+# (nanosleep, condvar timeouts) still round to the tick; the default 1 kHz
+# gives PX4's 800 Hz loop 1 ms steps. 0 = keep the procnto default.
+TICK_HZ="${TICK_HZ:-10000}"
+
 [ -f "$SSH_PUB" ] || { echo "missing ssh public key $SSH_PUB" >&2; exit 1; }
 
 export TMPDIR="${TMPDIR_QNX:-$HOME/qnx-vm/.tmp}"
-mkdir -p "$TMPDIR" "$VM_DIR"
+mkdir -p "$TMPDIR" "$VM_DIR/local/snippets"
 cd "$VM_DIR"
+
+if [ "$TICK_HZ" != 0 ]; then
+    echo "PROC_OPTIONS=\"-C $TICK_HZ\"" > local/snippets/options.px4tick
+else
+    rm -f local/snippets/options.px4tick
+fi
 
 # shellcheck disable=SC1091
 source "$QNX_SDP/qnxsdp-env.sh" >/dev/null

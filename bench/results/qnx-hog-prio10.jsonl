@@ -1,2 +1,2 @@
-{"label": "qnx-hog-prio10 idle", "events": 24022, "avg_us": 1254.56, "min_us": 7, "max_us": 5532, "std_us": 466.537}
-{"label": "qnx-hog-prio10 hog 8x prio 10", "events": 23995, "avg_us": 1250.55, "min_us": 8, "max_us": 7239, "std_us": 450.662}
+{"label": "qnx-hog-prio10 idle", "events": 24098, "avg_us": 1249.95, "min_us": 913, "max_us": 1566, "std_us": 73.407}
+{"label": "qnx-hog-prio10 hog 8x prio 10", "events": 24006, "avg_us": 1249.95, "min_us": 1061, "max_us": 1438, "std_us": 51.253}

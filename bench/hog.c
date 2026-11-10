@@ -10,6 +10,7 @@
  * Usage: hog <threads> [seconds]
  */
 #include <pthread.h>
+#include <sched.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,6 +47,15 @@ int main(int argc, char **argv)
 	if (n < 1 || n > 256 || secs < 1) {
 		fprintf(stderr, "usage: hog <threads 1..256> [seconds >= 1]\n");
 		return 2;
+	}
+
+	int policy;
+	struct sched_param sp;
+
+	if (pthread_getschedparam(pthread_self(), &policy, &sp) == 0) {
+		printf("hog: %d threads, %d s, priority %d, policy %s\n", n, secs, sp.sched_priority,
+		       policy == SCHED_FIFO ? "FIFO" : policy == SCHED_RR ? "RR" : "OTHER");
+		fflush(stdout);
 	}
 
 	deadline_ns = now_ns() + (uint64_t)secs * 1000000000u;

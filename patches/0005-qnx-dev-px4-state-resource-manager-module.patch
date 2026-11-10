@@ -1,0 +1,376 @@
+From 11b4a8d30014ce0465cf2862bd0b9c1c2616a546 Mon Sep 17 00:00:00 2001
+From: Sarcastic-Soul <anishisbusy@gmail.com>
+Date: Wed, 11 Nov 2026 05:17:05 +0530
+Subject: [PATCH 5/5] qnx: /dev/px4/state resource manager module
+
+---
+ ROMFS/px4fmu_common/init.d-posix/rcS          |   6 +
+ boards/qnx/sitl/default.px4board              |   1 +
+ src/modules/qnx_state_resmgr/CMakeLists.txt   |  39 +++
+ src/modules/qnx_state_resmgr/Kconfig          |   7 +
+ .../qnx_state_resmgr/qnx_state_resmgr.cpp     | 270 ++++++++++++++++++
+ 5 files changed, 323 insertions(+)
+ create mode 100644 src/modules/qnx_state_resmgr/CMakeLists.txt
+ create mode 100644 src/modules/qnx_state_resmgr/Kconfig
+ create mode 100644 src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp
+
+diff --git a/ROMFS/px4fmu_common/init.d-posix/rcS b/ROMFS/px4fmu_common/init.d-posix/rcS
+index a2d331b..8b930d6 100644
+--- a/ROMFS/px4fmu_common/init.d-posix/rcS
++++ b/ROMFS/px4fmu_common/init.d-posix/rcS
+@@ -351,6 +351,12 @@ fi
+ 
+ payload_deliverer start
+ 
++# QNX: live vehicle state for other QNX processes at /dev/px4/state
++if ver hwcmp QNX_SITL
++then
++	qnx_state_resmgr start
++fi
++
+ if param compare -s ICE_EN 1
+ then
+ 	internal_combustion_engine_control start
+diff --git a/boards/qnx/sitl/default.px4board b/boards/qnx/sitl/default.px4board
+index c9cde84..305e58d 100644
+--- a/boards/qnx/sitl/default.px4board
++++ b/boards/qnx/sitl/default.px4board
+@@ -44,3 +44,4 @@ CONFIG_SYSTEMCMDS_TOPIC_LISTENER=y
+ CONFIG_SYSTEMCMDS_UORB=y
+ CONFIG_SYSTEMCMDS_VER=y
+ CONFIG_SYSTEMCMDS_WORK_QUEUE=y
++CONFIG_MODULES_QNX_STATE_RESMGR=y
+diff --git a/src/modules/qnx_state_resmgr/CMakeLists.txt b/src/modules/qnx_state_resmgr/CMakeLists.txt
+new file mode 100644
+index 0000000..46c2ccc
+--- /dev/null
++++ b/src/modules/qnx_state_resmgr/CMakeLists.txt
+@@ -0,0 +1,39 @@
++############################################################################
++#
++#   Copyright (c) 2026 PX4 Development Team. All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions
++# are met:
++#
++# 1. Redistributions of source code must retain the above copyright
++#    notice, this list of conditions and the following disclaimer.
++# 2. Redistributions in binary form must reproduce the above copyright
++#    notice, this list of conditions and the following disclaimer in
++#    the documentation and/or other materials provided with the
++#    distribution.
++# 3. Neither the name PX4 nor the names of its contributors may be
++#    used to endorse or promote products derived from this software
++#    without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++# OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
++# AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++# POSSIBILITY OF SUCH DAMAGE.
++#
++############################################################################
++
++px4_add_module(
++	MODULE modules__qnx_state_resmgr
++	MAIN qnx_state_resmgr
++	SRCS
++		qnx_state_resmgr.cpp
++	)
+diff --git a/src/modules/qnx_state_resmgr/Kconfig b/src/modules/qnx_state_resmgr/Kconfig
+new file mode 100644
+index 0000000..1b481e1
+--- /dev/null
++++ b/src/modules/qnx_state_resmgr/Kconfig
+@@ -0,0 +1,7 @@
++menuconfig MODULES_QNX_STATE_RESMGR
++	bool "qnx_state_resmgr"
++	default n
++	depends on PLATFORM_POSIX
++	---help---
++		QNX only: serve live vehicle state as text at /dev/px4/state
++		through a QNX resource manager.
+diff --git a/src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp b/src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp
+new file mode 100644
+index 0000000..3ef2f58
+--- /dev/null
++++ b/src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp
+@@ -0,0 +1,270 @@
++/****************************************************************************
++ *
++ *   Copyright (c) 2026 PX4 Development Team. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ * 3. Neither the name PX4 nor the names of its contributors may be
++ *    used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
++ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ ****************************************************************************/
++
++/**
++ * @file qnx_state_resmgr.cpp
++ *
++ * QNX resource manager that publishes live vehicle state at /dev/px4/state.
++ * Any QNX process can read it with open()/read() (e.g. `cat /dev/px4/state`)
++ * without linking PX4, uORB or MAVLink. Each open() gets a fresh snapshot
++ * as one line of key=value text.
++ *
++ * The resource manager thread runs at a low priority so readers cannot
++ * disturb the control loops.
++ */
++
++#include <px4_platform_common/px4_config.h>
++#include <px4_platform_common/log.h>
++#include <px4_platform_common/module.h>
++#include <px4_platform_common/tasks.h>
++#include <drivers/drv_hrt.h>
++
++#include <uORB/Subscription.hpp>
++#include <uORB/topics/battery_status.h>
++#include <uORB/topics/vehicle_local_position.h>
++#include <uORB/topics/vehicle_status.h>
++
++#include <errno.h>
++#include <math.h>
++#include <stdio.h>
++#include <string.h>
++
++#include <sys/dispatch.h>
++#include <sys/iofunc.h>
++
++static constexpr const char *kPath = "/dev/px4/state";
++
++class QnxStateResmgr : public ModuleBase<QnxStateResmgr>
++{
++public:
++	static int task_spawn(int argc, char *argv[]);
++	static QnxStateResmgr *instantiate(int argc, char *argv[]) { return new QnxStateResmgr(); }
++	static int custom_command(int argc, char *argv[]) { return print_usage("unknown command"); }
++	static int print_usage(const char *reason = nullptr);
++
++	void run() override;
++	int print_status() override;
++
++private:
++	static int io_open(resmgr_context_t *ctp, io_open_t *msg, RESMGR_HANDLE_T *handle, void *extra);
++	static int io_read(resmgr_context_t *ctp, io_read_t *msg, RESMGR_OCB_T *ocb);
++
++	// Format the current state into _snapshot. Called from the resmgr thread only.
++	void update_snapshot();
++
++	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
++	uORB::Subscription _lpos_sub{ORB_ID(vehicle_local_position)};
++	uORB::Subscription _battery_sub{ORB_ID(battery_status)};
++
++	char _snapshot[256] {};
++	size_t _snapshot_len{0};
++	unsigned _reads{0};
++
++	resmgr_connect_funcs_t _connect_funcs{};
++	resmgr_io_funcs_t _io_funcs{};
++	iofunc_attr_t _attr{};
++};
++
++static QnxStateResmgr *g_self = nullptr;
++
++void QnxStateResmgr::update_snapshot()
++{
++	vehicle_status_s status{};
++	vehicle_local_position_s lpos{};
++	battery_status_s battery{};
++	const bool have_status = _status_sub.copy(&status);
++	const bool have_lpos = _lpos_sub.copy(&lpos);
++	const bool have_battery = _battery_sub.copy(&battery);
++
++	const int n = snprintf(_snapshot, sizeof(_snapshot),
++			       "t_us=%llu armed=%d nav_state=%d "
++			       "x=%.2f y=%.2f alt=%.2f vx=%.2f vy=%.2f vz=%.2f heading_deg=%.1f "
++			       "pos_valid=%d battery=%.2f\n",
++			       (unsigned long long)hrt_absolute_time(),
++			       have_status ? (status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) : -1,
++			       have_status ? (int)status.nav_state : -1,
++			       have_lpos ? (double)lpos.x : (double)NAN,
++			       have_lpos ? (double)lpos.y : (double)NAN,
++			       have_lpos ? (double) - lpos.z : (double)NAN,
++			       have_lpos ? (double)lpos.vx : (double)NAN,
++			       have_lpos ? (double)lpos.vy : (double)NAN,
++			       have_lpos ? (double)lpos.vz : (double)NAN,
++			       have_lpos ? (double)(lpos.heading * 57.29578f) : (double)NAN,
++			       have_lpos ? (lpos.xy_valid && lpos.z_valid) : 0,
++			       have_battery ? (double)battery.remaining : -1.0);
++
++	_snapshot_len = (n > 0) ? math::min((size_t)n, sizeof(_snapshot) - 1) : 0;
++}
++
++int QnxStateResmgr::io_open(resmgr_context_t *ctp, io_open_t *msg, RESMGR_HANDLE_T *handle, void *extra)
++{
++	// read-only device
++	if ((msg->connect.ioflag & _IO_FLAG_WR) != 0) {
++		return EROFS;
++	}
++
++	g_self->update_snapshot();
++	return iofunc_open_default(ctp, msg, static_cast<iofunc_attr_t *>(handle), extra);
++}
++
++int QnxStateResmgr::io_read(resmgr_context_t *ctp, io_read_t *msg, RESMGR_OCB_T *ocb_handle)
++{
++	iofunc_ocb_t *ocb = static_cast<iofunc_ocb_t *>(ocb_handle);
++	int status = iofunc_read_verify(ctp, msg, ocb, nullptr);
++
++	if (status != EOK) {
++		return status;
++	}
++
++	if ((msg->i.xtype & _IO_XTYPE_MASK) != _IO_XTYPE_NONE) {
++		return ENOSYS;
++	}
++
++	const size_t len = g_self->_snapshot_len;
++	const size_t offset = (size_t)ocb->offset;
++	size_t nbytes = 0;
++
++	if (offset < len) {
++		nbytes = math::min(len - offset, (size_t)msg->i.nbytes);
++	}
++
++	if (nbytes > 0) {
++		SETIOV(ctp->iov, g_self->_snapshot + offset, nbytes);
++		ocb->offset += nbytes;
++		g_self->_reads++;
++	}
++
++	_IO_SET_READ_NBYTES(ctp, nbytes);
++	return _RESMGR_NPARTS(nbytes > 0 ? 1 : 0);
++}
++
++void QnxStateResmgr::run()
++{
++	g_self = this;
++
++	dispatch_t *dpp = dispatch_create_channel(-1, DISPATCH_FLAG_NOLOCK);
++
++	if (dpp == nullptr) {
++		PX4_ERR("dispatch_create_channel failed: %s", strerror(errno));
++		return;
++	}
++
++	iofunc_func_init(_RESMGR_CONNECT_NFUNCS, &_connect_funcs, _RESMGR_IO_NFUNCS, &_io_funcs);
++	_connect_funcs.open = io_open;
++	_io_funcs.read = io_read;
++	iofunc_attr_init(&_attr, S_IFCHR | 0444, nullptr, nullptr);
++
++	resmgr_attr_t rattr{};
++	rattr.nparts_max = 1;
++	rattr.msg_max_size = 2048;
++
++	const int id = resmgr_attach(dpp, &rattr, kPath, _FTYPE_ANY, 0, &_connect_funcs, &_io_funcs, &_attr);
++
++	if (id == -1) {
++		PX4_ERR("resmgr_attach(%s) failed: %s (needs the PATHSPACE ability, e.g. run as root)", kPath, strerror(errno));
++		dispatch_destroy(dpp);
++		return;
++	}
++
++	PX4_INFO("serving vehicle state at %s", kPath);
++
++	// Wake up every 500 ms so should_exit() is checked even with no readers.
++	struct timespec timeout {0, 500 * 1000 * 1000};
++	dispatch_timeout(dpp, &timeout);
++	dispatch_context_t *ctp = dispatch_context_alloc(dpp);
++
++	while (!should_exit() && ctp != nullptr) {
++		dispatch_context_t *ready = dispatch_block(ctp);
++
++		if (ready != nullptr) {
++			ctp = ready;
++			dispatch_handler(ctp);
++		}
++	}
++
++	resmgr_detach(dpp, id, _RESMGR_DETACH_ALL);
++
++	if (ctp != nullptr) {
++		dispatch_context_free(ctp);
++	}
++
++	dispatch_destroy(dpp);
++	g_self = nullptr;
++}
++
++int QnxStateResmgr::print_status()
++{
++	PX4_INFO("path %s, %u reads served", kPath, _reads);
++	return 0;
++}
++
++int QnxStateResmgr::task_spawn(int argc, char *argv[])
++{
++	_task_id = px4_task_spawn_cmd("qnx_state_resmgr",
++				      SCHED_DEFAULT,
++				      SCHED_PRIORITY_DEFAULT - 30,
++				      2048,
++				      (px4_main_t)&run_trampoline,
++				      (char *const *)argv);
++
++	if (_task_id < 0) {
++		_task_id = -1;
++		return -errno;
++	}
++
++	return 0;
++}
++
++int QnxStateResmgr::print_usage(const char *reason)
++{
++	if (reason) {
++		PX4_WARN("%s\n", reason);
++	}
++
++	PRINT_MODULE_DESCRIPTION(
++		R"DESCR_STR(
++### Description
++QNX resource manager that serves live vehicle state as text at /dev/px4/state.
++Any QNX process can read it, e.g. `cat /dev/px4/state`.
++)DESCR_STR");
++
++	PRINT_MODULE_USAGE_NAME("qnx_state_resmgr", "system");
++	PRINT_MODULE_USAGE_COMMAND("start");
++	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
++	return 0;
++}
++
++extern "C" __EXPORT int qnx_state_resmgr_main(int argc, char *argv[])
++{
++	return QnxStateResmgr::main(argc, argv);
++}

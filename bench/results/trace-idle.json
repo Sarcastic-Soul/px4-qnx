@@ -1,0 +1,1 @@
+{"label": "idle", "trace_s": 2.0, "runs": 2190, "runs_per_s": 1095.1, "ready_to_running_pairs": 2190, "median_us": 2.59, "p99_us": 10.98, "max_us": 26.09}

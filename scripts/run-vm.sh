@@ -31,13 +31,13 @@ qemu-system-x86_64 \
 
 if [ "${1:-}" != "-f" ]; then
     # wait for sshd
-    for _ in $(seq 1 180); do
+    for _ in $(seq 1 300); do
         if "$(dirname "$0")/vm-ssh.sh" true 2>/dev/null; then
             echo "VM up (ssh port $SSH_PORT)"
             exit 0
         fi
         sleep 1
     done
-    echo "VM did not answer on ssh within 180 s; see $VM_DIR/output/qemu.out" >&2
+    echo "VM did not answer on ssh within 300 s; see $VM_DIR/output/qemu.out" >&2
     exit 1
 fi
