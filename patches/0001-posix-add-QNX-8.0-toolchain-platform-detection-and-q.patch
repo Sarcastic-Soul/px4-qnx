@@ -1,0 +1,426 @@
+From 40b64f311bc680cb6a2099766b255f68db7b907a Mon Sep 17 00:00:00 2001
+From: Sarcastic-Soul <anishisbusy@gmail.com>
+Date: Wed, 11 Nov 2026 02:10:53 +0530
+Subject: [PATCH 1/3] posix: add QNX 8.0 toolchain, platform detection and
+ qnx_sitl board
+
+---
+ boards/qnx/sitl/default.px4board              | 39 +++++++++
+ boards/qnx/sitl/src/CMakeLists.txt            | 37 +++++++++
+ boards/qnx/sitl/src/board_config.h            | 56 +++++++++++++
+ boards/qnx/sitl/src/board_shutdown.cpp        | 58 +++++++++++++
+ boards/qnx/sitl/src/sitl_led.c                | 81 +++++++++++++++++++
+ platforms/posix/CMakeLists.txt                | 15 ++--
+ .../posix/cmake/Toolchain-qnx-x86_64.cmake    | 50 ++++++++++++
+ platforms/posix/cmake/px4_impl_os.cmake       |  8 +-
+ 8 files changed, 338 insertions(+), 6 deletions(-)
+ create mode 100644 boards/qnx/sitl/default.px4board
+ create mode 100644 boards/qnx/sitl/src/CMakeLists.txt
+ create mode 100644 boards/qnx/sitl/src/board_config.h
+ create mode 100644 boards/qnx/sitl/src/board_shutdown.cpp
+ create mode 100644 boards/qnx/sitl/src/sitl_led.c
+ create mode 100644 platforms/posix/cmake/Toolchain-qnx-x86_64.cmake
+
+diff --git a/boards/qnx/sitl/default.px4board b/boards/qnx/sitl/default.px4board
+new file mode 100644
+index 0000000..fe6ab45
+--- /dev/null
++++ b/boards/qnx/sitl/default.px4board
+@@ -0,0 +1,39 @@
++CONFIG_PLATFORM_POSIX=y
++CONFIG_BOARD_TOOLCHAIN="qnx-x86_64"
++CONFIG_BOARD_ROOT_PATH="."
++CONFIG_BOARD_ETHERNET=y
++CONFIG_BOARD_NOLOCKSTEP=y
++CONFIG_MODULES_COMMANDER=y
++CONFIG_MODULES_CONTROL_ALLOCATOR=y
++CONFIG_MODULES_DATAMAN=y
++CONFIG_MODULES_EKF2=y
++CONFIG_MODULES_EVENTS=y
++CONFIG_MODULES_FLIGHT_MODE_MANAGER=y
++CONFIG_MODULES_LAND_DETECTOR=y
++CONFIG_MODULES_LOAD_MON=y
++CONFIG_MODULES_LOGGER=y
++CONFIG_MODULES_MANUAL_CONTROL=y
++CONFIG_MODULES_MAVLINK=y
++CONFIG_MAVLINK_DIALECT="development"
++CONFIG_MODULES_MC_ATT_CONTROL=y
++CONFIG_MODULES_MC_HOVER_THRUST_ESTIMATOR=y
++CONFIG_MODULES_MC_POS_CONTROL=y
++CONFIG_MODULES_MC_RATE_CONTROL=y
++CONFIG_MODULES_NAVIGATOR=y
++CONFIG_MODULES_RC_UPDATE=y
++CONFIG_MODULES_SENSORS=y
++CONFIG_MODULES_SIMULATION_BATTERY_SIMULATOR=y
++CONFIG_MODULES_SIMULATION_PWM_OUT_SIM=y
++CONFIG_MODULES_SIMULATION_SENSOR_BARO_SIM=y
++CONFIG_MODULES_SIMULATION_SENSOR_GPS_SIM=y
++CONFIG_MODULES_SIMULATION_SENSOR_MAG_SIM=y
++CONFIG_MODULES_SIMULATION_SIMULATOR_SIH=y
++CONFIG_MODULES_SIMULATION_SYSTEM_POWER_SIMULATOR=y
++CONFIG_SYSTEMCMDS_PARAM=y
++CONFIG_SYSTEMCMDS_PERF=y
++CONFIG_SYSTEMCMDS_SHUTDOWN=y
++CONFIG_SYSTEMCMDS_TOPIC_LISTENER=y
++CONFIG_SYSTEMCMDS_UORB=y
++CONFIG_SYSTEMCMDS_VER=y
++CONFIG_SYSTEMCMDS_WORK_QUEUE=y
++CONFIG_MODULES_SPACECRAFT=n
+diff --git a/boards/qnx/sitl/src/CMakeLists.txt b/boards/qnx/sitl/src/CMakeLists.txt
+new file mode 100644
+index 0000000..294f986
+--- /dev/null
++++ b/boards/qnx/sitl/src/CMakeLists.txt
+@@ -0,0 +1,37 @@
++############################################################################
++#
++#   Copyright (c) 2015-2017 PX4 Development Team. All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions
++# are met:
++#
++# 1. Redistributions of source code must retain the above copyright
++#    notice, this list of conditions and the following disclaimer.
++# 2. Redistributions in binary form must reproduce the above copyright
++#    notice, this list of conditions and the following disclaimer in
++#    the documentation and/or other materials provided with the
++#    distribution.
++# 3. Neither the name PX4 nor the names of its contributors may be
++#    used to endorse or promote products derived from this software
++#    without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++# OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
++# AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++# POSSIBILITY OF SUCH DAMAGE.
++#
++############################################################################
++
++add_library(drivers_board
++	board_shutdown.cpp
++	sitl_led.c
++)
+diff --git a/boards/qnx/sitl/src/board_config.h b/boards/qnx/sitl/src/board_config.h
+new file mode 100644
+index 0000000..e27c3ee
+--- /dev/null
++++ b/boards/qnx/sitl/src/board_config.h
+@@ -0,0 +1,56 @@
++/****************************************************************************
++ *
++ *   Copyright (c) 2017 PX4 Development Team. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ * 3. Neither the name PX4 nor the names of its contributors may be
++ *    used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
++ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ ****************************************************************************/
++
++/**
++ * @file board_config.h
++ *
++ * SITL internal definitions
++ */
++
++#pragma once
++
++#define BOARD_OVERRIDE_UUID "SIMULATIONID0000" // must be of length 16
++#define PX4_SOC_ARCH_ID     PX4_SOC_ARCH_ID_SITL
++
++#define BOARD_HAS_POWER_CONTROL 1
++
++#define PX4_NUMBER_I2C_BUSES 1
++
++#define BOARD_NUMBER_BRICKS     0
++#define BOARD_HAS_CONTROL_STATUS_LEDS 1
++#define BOARD_OVERLOAD_LED     LED_RED
++#define BOARD_ARMED_LED        LED_BLUE
++#define BOARD_ARMED_STATE_LED  LED_GREEN
++
++#include <system_config.h>
++#include <px4_platform_common/board_common.h>
+diff --git a/boards/qnx/sitl/src/board_shutdown.cpp b/boards/qnx/sitl/src/board_shutdown.cpp
+new file mode 100644
+index 0000000..eeb3e92
+--- /dev/null
++++ b/boards/qnx/sitl/src/board_shutdown.cpp
+@@ -0,0 +1,58 @@
++/****************************************************************************
++ *
++ *   Copyright (c) 2013 PX4 Development Team. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ * 3. Neither the name PX4 nor the names of its contributors may be
++ *    used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
++ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ ****************************************************************************/
++
++/**
++ * @file board_shutdown.cpp
++ *
++ * sitl board shutdown backend.
++ */
++
++#include <px4_platform_common/tasks.h>
++#include <board_config.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#if defined(BOARD_HAS_POWER_CONTROL)
++int board_register_power_state_notification_cb(power_button_state_notification_t cb)
++{
++	return 0;
++}
++
++int board_power_off(int status)
++{
++	printf("Exiting NOW.\n");
++	fflush(stdout);
++	system_exit(0);
++	return 0;
++}
++#endif // BOARD_HAS_POWER_CONTROL
+diff --git a/boards/qnx/sitl/src/sitl_led.c b/boards/qnx/sitl/src/sitl_led.c
+new file mode 100644
+index 0000000..f86e877
+--- /dev/null
++++ b/boards/qnx/sitl/src/sitl_led.c
+@@ -0,0 +1,81 @@
++/****************************************************************************
++ *
++ *   Copyright (c) 2013 PX4 Development Team. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ * 3. Neither the name PX4 nor the names of its contributors may be
++ *    used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
++ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ ****************************************************************************/
++
++/**
++ * @file sitl_led.c
++ *
++ * sitl LED backend.
++ */
++
++#include <px4_platform_common/px4_config.h>
++#include <px4_platform_common/log.h>
++#include <stdbool.h>
++
++__BEGIN_DECLS
++extern void led_init(void);
++extern void led_on(int led);
++extern void led_off(int led);
++extern void led_toggle(int led);
++__END_DECLS
++
++static bool _led_state[2] = { false, false };
++
++__EXPORT void led_init(void)
++{
++	PX4_DEBUG("LED_INIT");
++}
++
++__EXPORT void led_on(int led)
++{
++	if (led == 1 || led == 0) {
++		PX4_DEBUG("LED%d_ON", led);
++		_led_state[led] = true;
++	}
++}
++
++__EXPORT void led_off(int led)
++{
++	if (led == 1 || led == 0) {
++		PX4_DEBUG("LED%d_OFF", led);
++		_led_state[led] = false;
++	}
++}
++
++__EXPORT void led_toggle(int led)
++{
++	if (led == 1 || led == 0) {
++		_led_state[led] = !_led_state[led];
++		PX4_DEBUG("LED%d_TOGGLE: %s", led, _led_state[led] ? "ON" : "OFF");
++
++	}
++}
+diff --git a/platforms/posix/CMakeLists.txt b/platforms/posix/CMakeLists.txt
+index 71c546b..0863aac 100644
+--- a/platforms/posix/CMakeLists.txt
++++ b/platforms/posix/CMakeLists.txt
+@@ -66,12 +66,17 @@ target_link_libraries(px4
+ 		parameters
+ )
+ 
+-if((NOT APPLE) AND (NOT ANDROID))
+-	target_link_libraries(px4 PRIVATE rt)
+-endif()
++if(CMAKE_SYSTEM_NAME STREQUAL "QNX")
++	# librt and libpthread are part of libc on QNX; sockets live in libsocket.
++	target_link_libraries(px4 PRIVATE socket)
++else()
++	if((NOT APPLE) AND (NOT ANDROID))
++		target_link_libraries(px4 PRIVATE rt)
++	endif()
+ 
+-if(NOT ANDROID)
+-	target_link_libraries(px4 PRIVATE pthread)
++	if(NOT ANDROID)
++		target_link_libraries(px4 PRIVATE pthread)
++	endif()
+ endif()
+ 
+ target_link_libraries(px4 PRIVATE uORB)
+diff --git a/platforms/posix/cmake/Toolchain-qnx-x86_64.cmake b/platforms/posix/cmake/Toolchain-qnx-x86_64.cmake
+new file mode 100644
+index 0000000..5c9d81a
+--- /dev/null
++++ b/platforms/posix/cmake/Toolchain-qnx-x86_64.cmake
+@@ -0,0 +1,50 @@
++# QNX SDP 8.0 toolchain (qcc / q++) for x86_64 targets.
++#
++# Requires the QNX SDP environment (source qnxsdp-env.sh), which sets
++# QNX_HOST and QNX_TARGET.
++
++if(NOT DEFINED ENV{QNX_HOST} OR NOT DEFINED ENV{QNX_TARGET})
++	message(FATAL_ERROR "QNX_HOST/QNX_TARGET not set. Source qnxsdp-env.sh first.")
++endif()
++
++set(QNX_HOST "$ENV{QNX_HOST}")
++set(QNX_TARGET "$ENV{QNX_TARGET}")
++
++set(CMAKE_SYSTEM_NAME QNX)
++set(CMAKE_SYSTEM_PROCESSOR x86_64)
++set(CMAKE_SYSTEM_VERSION 8.0.0)
++
++set(arch gcc_ntox86_64)
++
++set(CMAKE_C_COMPILER ${QNX_HOST}/usr/bin/qcc)
++set(CMAKE_C_COMPILER_TARGET ${arch})
++
++set(CMAKE_CXX_COMPILER ${QNX_HOST}/usr/bin/q++)
++set(CMAKE_CXX_COMPILER_TARGET ${arch}_cxx)
++
++set(CMAKE_ASM_COMPILER ${QNX_HOST}/usr/bin/qcc)
++set(CMAKE_ASM_COMPILER_TARGET ${arch})
++
++set(CMAKE_AR ${QNX_HOST}/usr/bin/ntox86_64-ar CACHE FILEPATH "archiver")
++set(CMAKE_RANLIB ${QNX_HOST}/usr/bin/ntox86_64-ranlib CACHE FILEPATH "ranlib")
++set(CMAKE_NM ${QNX_HOST}/usr/bin/ntox86_64-nm CACHE FILEPATH "nm")
++set(CMAKE_OBJCOPY ${QNX_HOST}/usr/bin/ntox86_64-objcopy CACHE FILEPATH "objcopy")
++set(CMAKE_STRIP ${QNX_HOST}/usr/bin/ntox86_64-strip CACHE FILEPATH "strip")
++set(CMAKE_GDB ${QNX_HOST}/usr/bin/ntox86_64-gdb CACHE FILEPATH "gdb")
++
++set(CMAKE_SYSROOT ${QNX_TARGET})
++set(CMAKE_FIND_ROOT_PATH ${QNX_TARGET} ${QNX_TARGET}/x86_64)
++# Host programs (python, make, grep) for code generation, target libs/headers.
++set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
++set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
++set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
++set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
++
++# os tools used by the PX4 build
++foreach(tool grep make)
++	string(TOUPPER ${tool} TOOL)
++	find_program(${TOOL} ${tool})
++	if(NOT ${TOOL})
++		message(FATAL_ERROR "could not find ${tool}")
++	endif()
++endforeach()
+diff --git a/platforms/posix/cmake/px4_impl_os.cmake b/platforms/posix/cmake/px4_impl_os.cmake
+index 49c3813..c298abe 100644
+--- a/platforms/posix/cmake/px4_impl_os.cmake
++++ b/platforms/posix/cmake/px4_impl_os.cmake
+@@ -220,7 +220,13 @@ function(px4_os_add_flags)
+ 
+ 	include_directories(platforms/posix/include)
+ 
+-	if ("${PX4_BOARD}" MATCHES "sitl")
++	if (CMAKE_SYSTEM_NAME STREQUAL "QNX")
++		add_definitions(
++			-D__PX4_QNX
++			-D_QNX_SOURCE
++			)
++
++	elseif ("${PX4_BOARD}" MATCHES "sitl")
+ 
+ 		if(UNIX AND APPLE)
+ 			add_definitions(-D__PX4_DARWIN)

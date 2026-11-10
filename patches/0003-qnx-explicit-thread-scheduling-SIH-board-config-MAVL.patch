@@ -1,0 +1,236 @@
+From 4e4830fed01093e35be4be8293dec64c4023b89e Mon Sep 17 00:00:00 2001
+From: Sarcastic-Soul <anishisbusy@gmail.com>
+Date: Wed, 11 Nov 2026 03:49:21 +0530
+Subject: [PATCH 3/3] qnx: explicit thread scheduling, SIH board config,
+ MAVLink partner IP
+
+---
+ ROMFS/px4fmu_common/init.d-posix/px4-rc.mavlink      | 11 +++++++++--
+ boards/qnx/sitl/default.px4board                     | 11 +++++++++--
+ platforms/common/px4_log.cpp                         |  2 +-
+ platforms/common/px4_work_queue/WorkQueueManager.cpp | 11 +++++++++++
+ platforms/posix/cmake/Toolchain-qnx-x86_64.cmake     |  3 ++-
+ src/modules/commander/Commander.cpp                  |  2 +-
+ src/modules/commander/worker_thread.cpp              |  5 +++++
+ src/modules/logger/log_writer_file.cpp               |  5 +++++
+ src/modules/mavlink/mavlink_receiver.cpp             |  5 +++++
+ src/modules/simulation/pwm_out_sim/CMakeLists.txt    |  2 +-
+ src/modules/simulation/pwm_out_sim/PWMSim.hpp        |  2 +-
+ 11 files changed, 50 insertions(+), 9 deletions(-)
+
+diff --git a/ROMFS/px4fmu_common/init.d-posix/px4-rc.mavlink b/ROMFS/px4fmu_common/init.d-posix/px4-rc.mavlink
+index 17ef445..159e1c6 100644
+--- a/ROMFS/px4fmu_common/init.d-posix/px4-rc.mavlink
++++ b/ROMFS/px4fmu_common/init.d-posix/px4-rc.mavlink
+@@ -10,8 +10,15 @@ udp_onboard_gimbal_port_local=$((13030+px4_instance))
+ udp_onboard_gimbal_port_remote=$((13280+px4_instance))
+ udp_gcs_port_local=$((18570+px4_instance))
+ 
++# Optional partner IP for the GCS and offboard links (e.g. 10.0.2.2, the host
++# seen from a QEMU guest with user-mode networking). Default: localhost.
++mavlink_partner=""
++if [ -n "$PX4_MAVLINK_PARTNER_IP" ]; then
++	mavlink_partner="-t $PX4_MAVLINK_PARTNER_IP"
++fi
++
+ # GCS link
+-mavlink start -x -u $udp_gcs_port_local -r 4000000 -f
++mavlink start -x -u $udp_gcs_port_local -r 4000000 -f $mavlink_partner
+ mavlink stream -r 50 -s POSITION_TARGET_LOCAL_NED -u $udp_gcs_port_local
+ mavlink stream -r 50 -s LOCAL_POSITION_NED -u $udp_gcs_port_local
+ mavlink stream -r 50 -s GLOBAL_POSITION_INT -u $udp_gcs_port_local
+@@ -23,7 +30,7 @@ mavlink stream -r 20 -s RC_CHANNELS -u $udp_gcs_port_local
+ mavlink stream -r 10 -s OPTICAL_FLOW_RAD -u $udp_gcs_port_local
+ 
+ # API/Offboard link
+-mavlink start -x -u $udp_offboard_port_local -r 4000000 -f -m onboard -o $udp_offboard_port_remote
++mavlink start -x -u $udp_offboard_port_local -r 4000000 -f -m onboard -o $udp_offboard_port_remote $mavlink_partner
+ 
+ # Onboard link to camera
+ mavlink start -x -u $udp_onboard_payload_port_local -r 4000 -f -m onboard -o $udp_onboard_payload_port_remote
+diff --git a/boards/qnx/sitl/default.px4board b/boards/qnx/sitl/default.px4board
+index fe6ab45..c9cde84 100644
+--- a/boards/qnx/sitl/default.px4board
++++ b/boards/qnx/sitl/default.px4board
+@@ -3,24 +3,31 @@ CONFIG_BOARD_TOOLCHAIN="qnx-x86_64"
+ CONFIG_BOARD_ROOT_PATH="."
+ CONFIG_BOARD_ETHERNET=y
+ CONFIG_BOARD_NOLOCKSTEP=y
++CONFIG_DRIVERS_CAMERA_TRIGGER=y
++CONFIG_DRIVERS_TONE_ALARM=y
++CONFIG_MAVLINK_DIALECT="development"
+ CONFIG_MODULES_COMMANDER=y
+ CONFIG_MODULES_CONTROL_ALLOCATOR=y
+ CONFIG_MODULES_DATAMAN=y
+ CONFIG_MODULES_EKF2=y
+ CONFIG_MODULES_EVENTS=y
+ CONFIG_MODULES_FLIGHT_MODE_MANAGER=y
++CONFIG_MODULES_GYRO_CALIBRATION=y
++CONFIG_MODULES_GYRO_FFT=y
+ CONFIG_MODULES_LAND_DETECTOR=y
+ CONFIG_MODULES_LOAD_MON=y
+ CONFIG_MODULES_LOGGER=y
+ CONFIG_MODULES_MANUAL_CONTROL=y
+ CONFIG_MODULES_MAVLINK=y
+-CONFIG_MAVLINK_DIALECT="development"
+ CONFIG_MODULES_MC_ATT_CONTROL=y
++CONFIG_MODULES_MC_AUTOTUNE_ATTITUDE_CONTROL=y
+ CONFIG_MODULES_MC_HOVER_THRUST_ESTIMATOR=y
+ CONFIG_MODULES_MC_POS_CONTROL=y
+ CONFIG_MODULES_MC_RATE_CONTROL=y
+ CONFIG_MODULES_NAVIGATOR=y
++CONFIG_MODULES_PAYLOAD_DELIVERER=y
+ CONFIG_MODULES_RC_UPDATE=y
++CONFIG_MODULES_REPLAY=y
+ CONFIG_MODULES_SENSORS=y
+ CONFIG_MODULES_SIMULATION_BATTERY_SIMULATOR=y
+ CONFIG_MODULES_SIMULATION_PWM_OUT_SIM=y
+@@ -29,6 +36,7 @@ CONFIG_MODULES_SIMULATION_SENSOR_GPS_SIM=y
+ CONFIG_MODULES_SIMULATION_SENSOR_MAG_SIM=y
+ CONFIG_MODULES_SIMULATION_SIMULATOR_SIH=y
+ CONFIG_MODULES_SIMULATION_SYSTEM_POWER_SIMULATOR=y
++CONFIG_MODULES_SPACECRAFT=n
+ CONFIG_SYSTEMCMDS_PARAM=y
+ CONFIG_SYSTEMCMDS_PERF=y
+ CONFIG_SYSTEMCMDS_SHUTDOWN=y
+@@ -36,4 +44,3 @@ CONFIG_SYSTEMCMDS_TOPIC_LISTENER=y
+ CONFIG_SYSTEMCMDS_UORB=y
+ CONFIG_SYSTEMCMDS_VER=y
+ CONFIG_SYSTEMCMDS_WORK_QUEUE=y
+-CONFIG_MODULES_SPACECRAFT=n
+diff --git a/platforms/common/px4_log.cpp b/platforms/common/px4_log.cpp
+index 73a3671..649df48 100644
+--- a/platforms/common/px4_log.cpp
++++ b/platforms/common/px4_log.cpp
+@@ -170,7 +170,7 @@ __EXPORT void px4_log_modulename(int level, const char *module_name, const char
+ 		g_log_history.write(buf);
+ #endif // BOARD_ENABLE_LOG_HISTORY
+ 
+-#if defined(CONFIG_ARCH_BOARD_PX4_SITL)
++#if defined(CONFIG_ARCH_BOARD_PX4_SITL) || defined(CONFIG_ARCH_BOARD_QNX_SITL)
+ 		// Without flushing it's tricky to see stdout output when PX4 is started by
+ 		// a script like for the MAVSDK tests.
+ 		fflush(out);
+diff --git a/platforms/common/px4_work_queue/WorkQueueManager.cpp b/platforms/common/px4_work_queue/WorkQueueManager.cpp
+index 8d22e32..4315bfd 100644
+--- a/platforms/common/px4_work_queue/WorkQueueManager.cpp
++++ b/platforms/common/px4_work_queue/WorkQueueManager.cpp
+@@ -304,6 +304,17 @@ WorkQueueManagerRun(int, char **)
+ 				PX4_ERR("getting sched param for %s failed (%i)", wq->name, ret_getschedparam);
+ 			}
+ 
++#if defined(__PX4_QNX)
++			// QNX threads inherit the creator's scheduling by default, which
++			// would ignore the policy and priority set below.
++			int ret_setinheritsched = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
++
++			if (ret_setinheritsched != 0) {
++				PX4_ERR("setting explicit sched for %s failed (%i)", wq->name, ret_setinheritsched);
++			}
++
++#endif
++
+ 			// schedule policy FIFO
+ 			int ret_setschedpolicy = pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
+ 
+diff --git a/platforms/posix/cmake/Toolchain-qnx-x86_64.cmake b/platforms/posix/cmake/Toolchain-qnx-x86_64.cmake
+index 5c9d81a..fcc95cd 100644
+--- a/platforms/posix/cmake/Toolchain-qnx-x86_64.cmake
++++ b/platforms/posix/cmake/Toolchain-qnx-x86_64.cmake
+@@ -38,7 +38,8 @@ set(CMAKE_FIND_ROOT_PATH ${QNX_TARGET} ${QNX_TARGET}/x86_64)
+ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+-set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
++# BOTH: nested ExternalProjects (Micro-XRCE-DDS) find packages they install in the build dir.
++set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+ 
+ # os tools used by the PX4 build
+ foreach(tool grep make)
+diff --git a/src/modules/commander/Commander.cpp b/src/modules/commander/Commander.cpp
+index 663223c..2c3aaca 100644
+--- a/src/modules/commander/Commander.cpp
++++ b/src/modules/commander/Commander.cpp
+@@ -2414,7 +2414,7 @@ bool Commander::handleModeIntentionAndFailsafe()
+ 
+ void Commander::checkAndInformReadyForTakeoff()
+ {
+-#ifdef CONFIG_ARCH_BOARD_PX4_SITL
++#if defined(CONFIG_ARCH_BOARD_PX4_SITL) || defined(CONFIG_ARCH_BOARD_QNX_SITL)
+ 	static bool ready_for_takeoff_printed = false;
+ 
+ 	if (_vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING ||
+diff --git a/src/modules/commander/worker_thread.cpp b/src/modules/commander/worker_thread.cpp
+index 9859da4..7ec48fe 100644
+--- a/src/modules/commander/worker_thread.cpp
++++ b/src/modules/commander/worker_thread.cpp
+@@ -80,6 +80,11 @@ void WorkerThread::startTask(Request request)
+ 
+ 	/* low priority */
+ 	param.sched_priority = SCHED_PRIORITY_DEFAULT - 50;
++#if defined(__PX4_QNX)
++	// QNX threads inherit the creator's scheduling unless told otherwise
++	(void)pthread_attr_setinheritsched(&low_prio_attr, PTHREAD_EXPLICIT_SCHED);
++	(void)pthread_attr_setschedpolicy(&low_prio_attr, SCHED_FIFO);
++#endif
+ 	pthread_attr_setschedparam(&low_prio_attr, &param);
+ 
+ 	int ret = pthread_create(&_thread_handle, &low_prio_attr, &threadEntryTrampoline, this);
+diff --git a/src/modules/logger/log_writer_file.cpp b/src/modules/logger/log_writer_file.cpp
+index 851bcec..b39fe3a 100644
+--- a/src/modules/logger/log_writer_file.cpp
++++ b/src/modules/logger/log_writer_file.cpp
+@@ -289,6 +289,11 @@ int LogWriterFile::thread_start()
+ 	sched_param param;
+ 	/* low priority, as this is expensive disk I/O */
+ 	param.sched_priority = SCHED_PRIORITY_DEFAULT - 40;
++#if defined(__PX4_QNX)
++	// QNX threads inherit the creator's scheduling unless told otherwise
++	(void)pthread_attr_setinheritsched(&thr_attr, PTHREAD_EXPLICIT_SCHED);
++	(void)pthread_attr_setschedpolicy(&thr_attr, SCHED_FIFO);
++#endif
+ 	(void)pthread_attr_setschedparam(&thr_attr, &param);
+ 
+ 	pthread_attr_setstacksize(&thr_attr, PX4_STACK_ADJUSTED(1170));
+diff --git a/src/modules/mavlink/mavlink_receiver.cpp b/src/modules/mavlink/mavlink_receiver.cpp
+index 49ce052..f9ec6d7 100644
+--- a/src/modules/mavlink/mavlink_receiver.cpp
++++ b/src/modules/mavlink/mavlink_receiver.cpp
+@@ -3504,6 +3504,11 @@ void MavlinkReceiver::start()
+ 	struct sched_param param;
+ 	(void)pthread_attr_getschedparam(&receiveloop_attr, &param);
+ 	param.sched_priority = SCHED_PRIORITY_MAX - 80;
++#if defined(__PX4_QNX)
++	// QNX threads inherit the creator's scheduling unless told otherwise
++	(void)pthread_attr_setinheritsched(&receiveloop_attr, PTHREAD_EXPLICIT_SCHED);
++	(void)pthread_attr_setschedpolicy(&receiveloop_attr, SCHED_FIFO);
++#endif
+ 	(void)pthread_attr_setschedparam(&receiveloop_attr, &param);
+ 
+ 	pthread_attr_setstacksize(&receiveloop_attr,
+diff --git a/src/modules/simulation/pwm_out_sim/CMakeLists.txt b/src/modules/simulation/pwm_out_sim/CMakeLists.txt
+index 2802df3..7290d8a 100644
+--- a/src/modules/simulation/pwm_out_sim/CMakeLists.txt
++++ b/src/modules/simulation/pwm_out_sim/CMakeLists.txt
+@@ -31,7 +31,7 @@
+ #
+ ############################################################################
+ 
+-if(${PX4_BOARD_VENDOR}_${PX4_BOARD_MODEL} STREQUAL "px4_sitl")
++if((${PX4_BOARD_VENDOR}_${PX4_BOARD_MODEL} STREQUAL "px4_sitl") OR (${PX4_BOARD_VENDOR}_${PX4_BOARD_MODEL} STREQUAL "qnx_sitl"))
+ 	set(module_config "module_sim.yaml")
+ else()
+ 	set(module_config "module_hil.yaml")
+diff --git a/src/modules/simulation/pwm_out_sim/PWMSim.hpp b/src/modules/simulation/pwm_out_sim/PWMSim.hpp
+index 2c6fee7..48af685 100644
+--- a/src/modules/simulation/pwm_out_sim/PWMSim.hpp
++++ b/src/modules/simulation/pwm_out_sim/PWMSim.hpp
+@@ -44,7 +44,7 @@
+ #include <uORB/topics/parameter_update.h>
+ #include <uORB/Subscription.hpp>
+ 
+-#if defined(CONFIG_ARCH_BOARD_PX4_SITL)
++#if defined(CONFIG_ARCH_BOARD_PX4_SITL) || defined(CONFIG_ARCH_BOARD_QNX_SITL)
+ #define PARAM_PREFIX "PWM_MAIN"
+ #else
+ #define PARAM_PREFIX "HIL_ACT"

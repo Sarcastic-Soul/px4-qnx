@@ -1,0 +1,554 @@
+From a384c2a7013f14517acae14295ba7b280352cdb5 Mon Sep 17 00:00:00 2001
+From: Sarcastic-Soul <anishisbusy@gmail.com>
+Date: Wed, 11 Nov 2026 02:18:00 +0530
+Subject: [PATCH 2/3] posix: build fixes for QNX 8.0 (priorities, statfs,
+ dirent type, termios, load_mon, version)
+
+---
+ .../include/px4_platform_common/dirent.h      | 89 +++++++++++++++++++
+ .../include/px4_platform_common/statfs.h      | 80 +++++++++++++++++
+ .../include/px4_platform_common/tasks.h       | 12 +++
+ platforms/posix/src/px4/common/SerialImpl.cpp |  9 ++
+ platforms/posix/src/px4/common/print_load.cpp |  4 +-
+ src/lib/version/version.c                     |  6 +-
+ .../checks/sdcardCheck.cpp                    |  7 +-
+ src/modules/commander/ModeManagement.cpp      |  2 +-
+ src/modules/load_mon/LoadMon.cpp              | 24 ++++-
+ src/modules/load_mon/LoadMon.hpp              |  6 +-
+ src/modules/logger/util.cpp                   |  7 +-
+ src/modules/mavlink/mavlink_ftp.cpp           |  3 +-
+ src/modules/mavlink/mavlink_log_handler.cpp   |  9 +-
+ src/modules/mavlink/mavlink_main.cpp          | 10 +++
+ .../mavlink/streams/STORAGE_INFORMATION.hpp   |  7 +-
+ 15 files changed, 245 insertions(+), 30 deletions(-)
+ create mode 100644 platforms/common/include/px4_platform_common/dirent.h
+ create mode 100644 platforms/common/include/px4_platform_common/statfs.h
+
+diff --git a/platforms/common/include/px4_platform_common/dirent.h b/platforms/common/include/px4_platform_common/dirent.h
+new file mode 100644
+index 0000000..3a6b041
+--- /dev/null
++++ b/platforms/common/include/px4_platform_common/dirent.h
+@@ -0,0 +1,89 @@
++/****************************************************************************
++ *
++ *   Copyright (c) 2026 PX4 Development Team. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ * 3. Neither the name PX4 nor the names of its contributors may be
++ *    used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
++ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ ****************************************************************************/
++
++/**
++ * @file dirent.h
++ *
++ * Portable access to the type of a directory entry.
++ *
++ * struct dirent::d_type is a BSD/Linux extension. QNX does not have it, so
++ * there the type is read with fstatat() relative to the open directory.
++ */
++
++#pragma once
++
++#include <dirent.h>
++
++#if defined(__PX4_QNX)
++
++#include <fcntl.h>
++#include <sys/stat.h>
++
++#ifndef DT_UNKNOWN
++#define DT_UNKNOWN 0
++#endif
++#ifndef DT_DIR
++#define DT_DIR 4
++#endif
++#ifndef DT_REG
++#define DT_REG 8
++#endif
++
++static inline int px4_dirent_type(DIR *dp, const struct dirent *entry)
++{
++	struct stat st;
++
++	if (fstatat(dirfd(dp), entry->d_name, &st, AT_SYMLINK_NOFOLLOW) != 0) {
++		return DT_UNKNOWN;
++	}
++
++	if (S_ISDIR(st.st_mode)) {
++		return DT_DIR;
++	}
++
++	if (S_ISREG(st.st_mode)) {
++		return DT_REG;
++	}
++
++	return DT_UNKNOWN;
++}
++
++#else
++
++static inline int px4_dirent_type(DIR *dp, const struct dirent *entry)
++{
++	(void)dp;
++	return entry->d_type;
++}
++
++#endif
+diff --git a/platforms/common/include/px4_platform_common/statfs.h b/platforms/common/include/px4_platform_common/statfs.h
+new file mode 100644
+index 0000000..821c405
+--- /dev/null
++++ b/platforms/common/include/px4_platform_common/statfs.h
+@@ -0,0 +1,80 @@
++/****************************************************************************
++ *
++ *   Copyright (c) 2026 PX4 Development Team. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ * 3. Neither the name PX4 nor the names of its contributors may be
++ *    used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++ * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
++ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ ****************************************************************************/
++
++/**
++ * @file statfs.h
++ *
++ * Portable statfs(). Linux has <sys/statfs.h>, macOS <sys/mount.h>.
++ * QNX only has POSIX statvfs(), so a minimal statfs() is built on it with the
++ * fields PX4 uses (f_bsize, f_blocks, f_bfree, f_bavail). statvfs counts
++ * blocks in f_frsize units, so f_bsize is set to f_frsize to keep
++ * f_blocks * f_bsize equal to the byte size.
++ */
++
++#pragma once
++
++#if defined(__PX4_DARWIN)
++#include <sys/param.h>
++#include <sys/mount.h>
++
++#elif defined(__PX4_QNX)
++#include <sys/statvfs.h>
++
++struct statfs {
++	unsigned long f_bsize;
++	fsblkcnt_t f_blocks;
++	fsblkcnt_t f_bfree;
++	fsblkcnt_t f_bavail;
++};
++
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wshadow"
++static inline int statfs(const char *path, struct statfs *buf)
++{
++	struct statvfs vfs;
++
++	if (statvfs(path, &vfs) != 0) {
++		return -1;
++	}
++
++	buf->f_bsize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
++	buf->f_blocks = vfs.f_blocks;
++	buf->f_bfree = vfs.f_bfree;
++	buf->f_bavail = vfs.f_bavail;
++	return 0;
++}
++#pragma GCC diagnostic pop
++
++#else
++#include <sys/statfs.h>
++#endif
+diff --git a/platforms/common/include/px4_platform_common/tasks.h b/platforms/common/include/px4_platform_common/tasks.h
+index 6609b4c..cc87b04 100644
+--- a/platforms/common/include/px4_platform_common/tasks.h
++++ b/platforms/common/include/px4_platform_common/tasks.h
+@@ -73,6 +73,18 @@ typedef int px4_task_t;
+ #define SCHED_PRIORITY_MIN sched_get_priority_min(SCHED_FIFO)
+ #define SCHED_PRIORITY_DEFAULT (((sched_get_priority_max(SCHED_FIFO) - sched_get_priority_min(SCHED_FIFO)) / 2) + sched_get_priority_min(SCHED_FIFO))
+ 
++#elif defined(__PX4_QNX)
++
++/*
++ * QNX 8.0 reserves priority 255 for IPIs and 254 for the clock IST, so cap the
++ * top of the PX4 range at 253. The rest of the PX4 priorities are offsets
++ * below SCHED_PRIORITY_MAX and stay in 1..253.
++ */
++#define PX4_QNX_PRIORITY_CAP 253
++#define SCHED_PRIORITY_MAX ((sched_get_priority_max(SCHED_FIFO) > PX4_QNX_PRIORITY_CAP) ? PX4_QNX_PRIORITY_CAP : sched_get_priority_max(SCHED_FIFO))
++#define SCHED_PRIORITY_MIN sched_get_priority_min(SCHED_FIFO)
++#define SCHED_PRIORITY_DEFAULT (((SCHED_PRIORITY_MAX - SCHED_PRIORITY_MIN) / 2) + SCHED_PRIORITY_MIN)
++
+ #elif defined(__PX4_QURT)
+ 
+ #define SCHED_PRIORITY_MAX 255
+diff --git a/platforms/posix/src/px4/common/SerialImpl.cpp b/platforms/posix/src/px4/common/SerialImpl.cpp
+index 0c23b05..927f103 100644
+--- a/platforms/posix/src/px4/common/SerialImpl.cpp
++++ b/platforms/posix/src/px4/common/SerialImpl.cpp
+@@ -34,6 +34,11 @@
+ #include <SerialImpl.hpp>
+ #include <string.h> // strncpy
+ #include <termios.h>
++
++#if defined(__PX4_QNX) && !defined(CRTSCTS)
++// QNX names hardware flow control IHFLOW (RTS) / OHFLOW (CTS)
++#define CRTSCTS (IHFLOW | OHFLOW)
++#endif
+ #include <px4_log.h>
+ #include <fcntl.h>
+ #include <errno.h>
+@@ -82,6 +87,10 @@ bool SerialImpl::configure()
+ 
+ 	case 115200: speed = B115200; break;
+ 
++#ifndef B230400
++#define B230400 230400
++#endif
++
+ 	case 230400: speed = B230400; break;
+ 
+ #ifndef B460800
+diff --git a/platforms/posix/src/px4/common/print_load.cpp b/platforms/posix/src/px4/common/print_load.cpp
+index a392fb8..3c4fd82 100644
+--- a/platforms/posix/src/px4/common/print_load.cpp
++++ b/platforms/posix/src/px4/common/print_load.cpp
+@@ -92,8 +92,8 @@ void print_load(int fd, struct print_load_s *print_state)
+ 		memset(clear_line, 0, sizeof(clear_line));
+ 	}
+ 
+-#if defined(__PX4_LINUX) || defined(__PX4_CYGWIN) || defined(__PX4_QURT)
+-	dprintf(fd, "%sTOP NOT IMPLEMENTED ON LINUX, QURT, WINDOWS (ONLY ON NUTTX, APPLE)\n", clear_line);
++#if defined(__PX4_LINUX) || defined(__PX4_CYGWIN) || defined(__PX4_QURT) || defined(__PX4_QNX)
++	dprintf(fd, "%sTOP NOT IMPLEMENTED ON LINUX, QURT, WINDOWS, QNX (ONLY ON NUTTX, APPLE)\n", clear_line);
+ 
+ #elif defined(__PX4_DARWIN)
+ 	pid_t pid = getpid();   //-- this is the process id you need info for
+diff --git a/src/lib/version/version.c b/src/lib/version/version.c
+index 6144ca4..a5daf0d 100644
+--- a/src/lib/version/version.c
++++ b/src/lib/version/version.c
+@@ -41,7 +41,7 @@
+ # define CONFIG_CDCACM_PRODUCTID 0
+ #endif
+ 
+-#if defined(__PX4_LINUX)
++#if defined(__PX4_LINUX) || defined(__PX4_QNX)
+ #include <sys/utsname.h>
+ #endif
+ 
+@@ -302,7 +302,7 @@ uint32_t px4_os_version(void)
+ {
+ #if defined(__PX4_DARWIN) || defined(__PX4_CYGWIN) || defined(__PX4_QURT)
+ 	return 0; //TODO: implement version for Darwin, Cygwin, QuRT
+-#elif defined(__PX4_LINUX)
++#elif defined(__PX4_LINUX) || defined(__PX4_QNX)
+ 	struct utsname name;
+ 
+ 	if (uname(&name) == 0) {
+@@ -348,6 +348,8 @@ const char *px4_os_name(void)
+ 	return "NuttX";
+ #elif defined(__PX4_CYGWIN)
+ 	return "Cygwin";
++#elif defined(__PX4_QNX)
++	return "QNX";
+ #else
+ # error "px4_os_name not implemented for current OS"
+ #endif
+diff --git a/src/modules/commander/HealthAndArmingChecks/checks/sdcardCheck.cpp b/src/modules/commander/HealthAndArmingChecks/checks/sdcardCheck.cpp
+index 89ba247..4751542 100644
+--- a/src/modules/commander/HealthAndArmingChecks/checks/sdcardCheck.cpp
++++ b/src/modules/commander/HealthAndArmingChecks/checks/sdcardCheck.cpp
+@@ -35,11 +35,8 @@
+ #include <dirent.h>
+ #include <string.h>
+ 
+-#ifdef __PX4_DARWIN
+-#include <sys/param.h>
+-#include <sys/mount.h>
+-#elif defined(PX4_STORAGEDIR)
+-#include <sys/statfs.h>
++#ifdef PX4_STORAGEDIR
++#include <px4_platform_common/statfs.h>
+ #endif
+ 
+ void SdCardChecks::checkAndReport(const Context &context, Report &reporter)
+diff --git a/src/modules/commander/ModeManagement.cpp b/src/modules/commander/ModeManagement.cpp
+index b26bb99..ec89a3d 100644
+--- a/src/modules/commander/ModeManagement.cpp
++++ b/src/modules/commander/ModeManagement.cpp
+@@ -164,7 +164,7 @@ uint8_t Modes::addExternalMode(const Modes::Mode &mode)
+ 
+ 	if (new_mode_idx != -1 && !_modes[new_mode_idx].valid) {
+ 		if (need_to_update_param) {
+-			char hash_param_name[20];
++			char hash_param_name[32];
+ 			snprintf(hash_param_name, sizeof(hash_param_name), "COM_MODE%d_HASH", new_mode_idx);
+ 			const param_t handle = param_find(hash_param_name);
+ 
+diff --git a/src/modules/load_mon/LoadMon.cpp b/src/modules/load_mon/LoadMon.cpp
+index 937d02c..2d101c3 100644
+--- a/src/modules/load_mon/LoadMon.cpp
++++ b/src/modules/load_mon/LoadMon.cpp
+@@ -33,6 +33,10 @@
+ 
+ #include "LoadMon.hpp"
+ 
++#if defined(__PX4_QNX)
++#include <unistd.h>
++#endif
++
+ #if defined(__PX4_NUTTX)
+ // if free stack space falls below this, print a warning
+ #if defined(CONFIG_ARMV7M_STACKCHECK)
+@@ -122,7 +126,7 @@ void LoadMon::Run()
+ 
+ void LoadMon::cpuload()
+ {
+-#if defined(__PX4_LINUX)
++#if defined(__PX4_LINUX) || defined(__PX4_QNX)
+ 	tms spent_time_stamp_struct;
+ 	clock_t total_time_stamp = times(&spent_time_stamp_struct);
+ 	clock_t spent_time_stamp = spent_time_stamp_struct.tms_utime + spent_time_stamp_struct.tms_stime;
+@@ -223,6 +227,22 @@ void LoadMon::cpuload()
+ 		cpuload.ram_usage = -1;
+ 	}
+ 
++	cpuload.load = interval_spent_time / interval;
++#elif defined(__PX4_QNX)
++	// RAM: whole-system usage from total and available physical pages.
++	// -1 means not available.
++	const long phys_pages = sysconf(_SC_PHYS_PAGES);
++	const long avail_pages = sysconf(_SC_AVPHYS_PAGES);
++
++	if (phys_pages > 0 && avail_pages >= 0 && avail_pages <= phys_pages) {
++		cpuload.ram_usage = (float)(phys_pages - avail_pages) / (float)phys_pages;
++
++	} else {
++		cpuload.ram_usage = -1;
++	}
++
++	// CPU: this process's user + system time over wall time (same as Linux).
++	// On a multi-core target this is the load of PX4 summed over all cores.
+ 	cpuload.load = interval_spent_time / interval;
+ #elif defined(__PX4_NUTTX)
+ 	// get ram usage
+@@ -238,7 +258,7 @@ void LoadMon::cpuload()
+ 	_cpuload_pub.publish(cpuload);
+ 
+ 	// store for next iteration
+-#if defined(__PX4_LINUX)
++#if defined(__PX4_LINUX) || defined(__PX4_QNX)
+ 	_last_total_time_stamp = total_time_stamp;
+ 	_last_spent_time_stamp = spent_time_stamp;
+ #elif defined(__PX4_NUTTX)
+diff --git a/src/modules/load_mon/LoadMon.hpp b/src/modules/load_mon/LoadMon.hpp
+index 212aef8..a82ca77 100644
+--- a/src/modules/load_mon/LoadMon.hpp
++++ b/src/modules/load_mon/LoadMon.hpp
+@@ -48,7 +48,7 @@
+ #include <uORB/topics/cpuload.h>
+ #include <uORB/topics/task_stack_info.h>
+ 
+-#if defined(__PX4_LINUX)
++#if defined(__PX4_LINUX) || defined(__PX4_QNX)
+ #include <sys/times.h>
+ #endif
+ 
+@@ -97,6 +97,10 @@ private:
+ 	/* calculate usage directly from clock ticks on Linux */
+ 	clock_t _last_total_time_stamp{};
+ 	clock_t _last_spent_time_stamp{};
++#elif defined(__PX4_QNX)
++	/* process CPU time from times(), like Linux; RAM from sysconf() */
++	clock_t _last_total_time_stamp{};
++	clock_t _last_spent_time_stamp{};
+ #elif defined(__PX4_NUTTX)
+ 	hrt_abstime _last_idle_time {0};
+ 	hrt_abstime _last_idle_time_sample{0};
+diff --git a/src/modules/logger/util.cpp b/src/modules/logger/util.cpp
+index 5fdd576..24d3f52 100644
+--- a/src/modules/logger/util.cpp
++++ b/src/modules/logger/util.cpp
+@@ -48,12 +48,7 @@
+ #include <px4_platform_common/time.h>
+ #include <systemlib/mavlink_log.h>
+ 
+-#if defined(__PX4_DARWIN)
+-#include <sys/param.h>
+-#include <sys/mount.h>
+-#else
+-#include <sys/statfs.h>
+-#endif
++#include <px4_platform_common/statfs.h>
+ 
+ #define GPS_EPOCH_SECS ((time_t)1234567890ULL)
+ 
+diff --git a/src/modules/mavlink/mavlink_ftp.cpp b/src/modules/mavlink/mavlink_ftp.cpp
+index 142c730..7b98fb2 100644
+--- a/src/modules/mavlink/mavlink_ftp.cpp
++++ b/src/modules/mavlink/mavlink_ftp.cpp
+@@ -41,6 +41,7 @@
+ #include <sys/stat.h>
+ #include <errno.h>
+ #include <cstring>
++#include <px4_platform_common/dirent.h>
+ 
+ #include "mavlink_ftp.h"
+ #include "mavlink_main.h"
+@@ -381,7 +382,7 @@ MavlinkFTP::_workList(PayloadHeader *payload)
+ 		char direntType;
+ 
+ 		// Determine the directory entry type
+-		switch (result->d_type) {
++		switch (px4_dirent_type(dp, result)) {
+ #ifdef __PX4_NUTTX
+ 
+ 		case DTYPE_FILE: {
+diff --git a/src/modules/mavlink/mavlink_log_handler.cpp b/src/modules/mavlink/mavlink_log_handler.cpp
+index 1afa323..0ff4115 100644
+--- a/src/modules/mavlink/mavlink_log_handler.cpp
++++ b/src/modules/mavlink/mavlink_log_handler.cpp
+@@ -34,6 +34,7 @@
+ #include "mavlink_log_handler.h"
+ #include "mavlink_main.h"
+ #include <dirent.h>
++#include <px4_platform_common/dirent.h>
+ #include <sys/stat.h>
+ 
+ static constexpr int MAX_BYTES_BURST = 256 * 1024;
+@@ -385,7 +386,7 @@ bool MavlinkLogHandler::create_log_list_file()
+ 			break;
+ 		}
+ 
+-		if (result->d_type != PX4LOG_DIRECTORY) {
++		if (px4_dirent_type(dp, result) != PX4LOG_DIRECTORY) {
+ 			// Skip stray files
+ 			continue;
+ 		}
+@@ -437,7 +438,7 @@ void MavlinkLogHandler::write_entries_to_file(FILE *fp, const char *dir)
+ 			break;
+ 		}
+ 
+-		if (result->d_type != PX4LOG_REGULAR_FILE) {
++		if (px4_dirent_type(dp, result) != PX4LOG_REGULAR_FILE) {
+ 			// Skip non files
+ 			continue;
+ 		}
+@@ -539,7 +540,7 @@ void MavlinkLogHandler::delete_all_logs(const char *dir)
+ 			break;
+ 		}
+ 
+-		if (result->d_type == PX4LOG_DIRECTORY && result->d_name[0] != '.') {
++		if (px4_dirent_type(dp, result) == PX4LOG_DIRECTORY && result->d_name[0] != '.') {
+ 			char filepath[PX4_MAX_FILEPATH];
+ 			int ret = snprintf(filepath, sizeof(filepath), "%s/%s", dir, result->d_name);
+ 			bool path_is_ok = (ret > 0) && (ret < (int)sizeof(filepath));
+@@ -553,7 +554,7 @@ void MavlinkLogHandler::delete_all_logs(const char *dir)
+ 			}
+ 		}
+ 
+-		if (result->d_type == PX4LOG_REGULAR_FILE) {
++		if (px4_dirent_type(dp, result) == PX4LOG_REGULAR_FILE) {
+ 			char filepath[PX4_MAX_FILEPATH];
+ 			int ret = snprintf(filepath, sizeof(filepath), "%s/%s", dir, result->d_name);
+ 			bool path_is_ok = (ret > 0) && (ret < (int)sizeof(filepath));
+diff --git a/src/modules/mavlink/mavlink_main.cpp b/src/modules/mavlink/mavlink_main.cpp
+index 0312a0b..972247c 100644
+--- a/src/modules/mavlink/mavlink_main.cpp
++++ b/src/modules/mavlink/mavlink_main.cpp
+@@ -42,6 +42,7 @@
+ 
+ #include <termios.h>
+ 
++
+ #ifdef CONFIG_NET
+ #include <arpa/inet.h>
+ #include <netinet/in.h>
+@@ -70,6 +71,11 @@
+ #error The non-standard CRTSCTS define is incorrect. Fix this in the OS or replace with (CRTS_IFLOW | CCTS_OFLOW)
+ #endif
+ 
++#if defined(__PX4_QNX) && !defined(CRTSCTS)
++// QNX names hardware flow control IHFLOW (RTS) / OHFLOW (CTS)
++#define CRTSCTS (IHFLOW | OHFLOW)
++#endif
++
+ #ifdef CONFIG_NET
+ #define MAVLINK_NET_ADDED_STACK PX4_STACK_ADJUSTED(350)
+ #else
+@@ -492,6 +498,10 @@ Mavlink::forward_message(const mavlink_message_t *msg, Mavlink *self)
+ int
+ Mavlink::mavlink_open_uart(const int baud, const char *uart_name, const FLOW_CONTROL_MODE flow_control)
+ {
++#ifndef B230400
++#define B230400 230400
++#endif
++
+ #ifndef B460800
+ #define B460800 460800
+ #endif
+diff --git a/src/modules/mavlink/streams/STORAGE_INFORMATION.hpp b/src/modules/mavlink/streams/STORAGE_INFORMATION.hpp
+index 2670c2a..72943b6 100644
+--- a/src/modules/mavlink/streams/STORAGE_INFORMATION.hpp
++++ b/src/modules/mavlink/streams/STORAGE_INFORMATION.hpp
+@@ -34,12 +34,7 @@
+ #ifndef STORAGE_INFORMATION_HPP
+ #define STORAGE_INFORMATION_HPP
+ 
+-#ifdef __PX4_DARWIN
+-#include <sys/param.h>
+-#include <sys/mount.h>
+-#else
+-#include <sys/statfs.h>
+-#endif
++#include <px4_platform_common/statfs.h>
+ 
+ #include <math.h>
+ 
