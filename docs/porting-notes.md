@@ -3,7 +3,15 @@
 Target: QNX SDP 8.0.5, `qcc` 12.2.0 (`gcc_ntox86_64`), QEMU x86_64 + KVM.
 Approach: extend `platforms/posix` with a `__PX4_QNX` code path. No new PX4 platform.
 
-Patches live in `patches/` (exported from branch `qnx-port` with `scripts/export-patches.sh`).
+Patches live in `patches/` (exported from branch `qnx-port` with `scripts/export-patches.sh`):
+
+| Patch | Content |
+|---|---|
+| 0001 | toolchain, `__PX4_QNX` detection, link libs, `qnx_sitl` board |
+| 0002 | build fixes: priorities cap, statfs, dirent type, termios, load_mon, version |
+| 0003 | explicit thread scheduling, SITL defines for the QNX board, MAVLink partner IP |
+| 0004 | `mc_rate_control` interval perf counter |
+| 0005 | `qnx_state_resmgr` module (`/dev/px4/state`) |
 
 ## Build system
 
@@ -39,6 +47,15 @@ Scheduling (runtime, found in Stage 4):
 Networking:
 
 - MAVLink defaults to sending to `127.0.0.1`. From a QEMU user-NAT guest the host is `10.0.2.2`. `px4-rc.mavlink` now passes `-t $PX4_MAVLINK_PARTNER_IP` to the GCS and offboard instances when that variable is set (`scripts/px4-vm.sh` sets `10.0.2.2`). Unset = upstream behaviour.
+
+Timing:
+
+- QNX normal timers (nanosleep, condvar/semaphore timeouts) round to the system tick, 1 ms by default. PX4's 800 Hz loop then runs as a mix of 1 ms and 2 ms waits (idle std dev 440 us). `procmgr_timer_tolerance()` and `TimerTimeout(TIMER_TOLERANCE)` did not change this in our tests. `scripts/make-vm.sh` boots `procnto -C 10000` (10 kHz tick) through a mkqnximage `options.*` snippet, which brings idle std dev to 73 us. No PX4 code change. Set `TICK_HZ=0` for the default.
+
+QNX-specific additions:
+
+- `src/modules/qnx_state_resmgr`: QNX resource manager at `/dev/px4/state` (patch 0005), started from `rcS` only on `QNX_SITL`.
+- `mc_rate_control: interval` perf counter (patch 0004), used by `bench/`. Platform-neutral.
 
 ## Stubs and "not available" values
 
