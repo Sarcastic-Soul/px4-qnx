@@ -25,9 +25,11 @@ start)
     if running; then echo "PX4 already running"; exit 0; fi
     clean=""
     [ "${2:-}" = "--clean" ] && clean="rm -rf parameters*.bson dataman log;"
-    vm "mkdir -p $PX4_ROOT/rootfs && cd $PX4_ROOT/rootfs && $clean \
+    # The QNX sshd sometimes keeps the session open while the background PX4
+    # runs, so don't wait on it: launch with -n and a short timeout, then poll.
+    VM_TIMEOUT=5 vm -n "mkdir -p $PX4_ROOT/rootfs && cd $PX4_ROOT/rootfs && $clean \
         PX4_SIM_MODEL=$MODEL PX4_MAVLINK_PARTNER_IP=$PARTNER \
-        nohup ../bin/px4 -d $PX4_ROOT/etc > $PX4_ROOT/px4.log 2>&1 < /dev/null &"
+        nohup ../bin/px4 -d $PX4_ROOT/etc > $PX4_ROOT/px4.log 2>&1 < /dev/null &" || true
     for _ in $(seq 1 30); do
         if vm "cd $PX4_ROOT/rootfs && ../bin/px4-commander status" >/dev/null 2>&1; then
             echo "PX4 started in VM ($MODEL, MAVLink partner $PARTNER)"
