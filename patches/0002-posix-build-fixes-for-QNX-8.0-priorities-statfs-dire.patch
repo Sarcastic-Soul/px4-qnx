@@ -1,7 +1,7 @@
 From a384c2a7013f14517acae14295ba7b280352cdb5 Mon Sep 17 00:00:00 2001
 From: Sarcastic-Soul <anishisbusy@gmail.com>
 Date: Wed, 11 Nov 2026 02:18:00 +0530
-Subject: [PATCH 2/3] posix: build fixes for QNX 8.0 (priorities, statfs,
+Subject: [PATCH 2/4] posix: build fixes for QNX 8.0 (priorities, statfs,
  dirent type, termios, load_mon, version)
 
 ---

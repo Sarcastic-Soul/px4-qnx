@@ -1,0 +1,2 @@
+{"label": "qnx-hog-prio10 idle", "events": 24022, "avg_us": 1254.56, "min_us": 7, "max_us": 5532, "std_us": 466.537}
+{"label": "qnx-hog-prio10 hog 8x prio 10", "events": 23995, "avg_us": 1250.55, "min_us": 8, "max_us": 7239, "std_us": 450.662}

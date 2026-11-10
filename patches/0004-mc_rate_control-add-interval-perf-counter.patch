@@ -1,0 +1,43 @@
+From d556ddd49cc5a84f24e185207a6c147cf4c1f655 Mon Sep 17 00:00:00 2001
+From: Sarcastic-Soul <anishisbusy@gmail.com>
+Date: Wed, 11 Nov 2026 04:31:15 +0530
+Subject: [PATCH 4/4] mc_rate_control: add interval perf counter
+
+---
+ src/modules/mc_rate_control/MulticopterRateControl.cpp | 3 +++
+ src/modules/mc_rate_control/MulticopterRateControl.hpp | 1 +
+ 2 files changed, 4 insertions(+)
+
+diff --git a/src/modules/mc_rate_control/MulticopterRateControl.cpp b/src/modules/mc_rate_control/MulticopterRateControl.cpp
+index a7a8ed4..22db229 100644
+--- a/src/modules/mc_rate_control/MulticopterRateControl.cpp
++++ b/src/modules/mc_rate_control/MulticopterRateControl.cpp
+@@ -59,6 +59,7 @@ MulticopterRateControl::MulticopterRateControl(bool vtol) :
+ MulticopterRateControl::~MulticopterRateControl()
+ {
+ 	perf_free(_loop_perf);
++	perf_free(_loop_interval_perf);
+ }
+ 
+ bool
+@@ -125,6 +126,8 @@ MulticopterRateControl::Run()
+ 
+ 	if (_vehicle_angular_velocity_sub.update(&angular_velocity)) {
+ 
++		perf_count(_loop_interval_perf);
++
+ 		const hrt_abstime now = angular_velocity.timestamp_sample;
+ 
+ 		// Guard against too small (< 0.125ms) and too large (> 20ms) dt's.
+diff --git a/src/modules/mc_rate_control/MulticopterRateControl.hpp b/src/modules/mc_rate_control/MulticopterRateControl.hpp
+index 76e4883..054bb0b 100644
+--- a/src/modules/mc_rate_control/MulticopterRateControl.hpp
++++ b/src/modules/mc_rate_control/MulticopterRateControl.hpp
+@@ -119,6 +119,7 @@ private:
+ 	hrt_abstime _last_run{0};
+ 
+ 	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
++	perf_counter_t	_loop_interval_perf{perf_alloc(PC_INTERVAL, MODULE_NAME": interval")};	/**< time between control updates */
+ 
+ 	// keep setpoint values between updates
+ 	matrix::Vector3f _acro_rate_max;		/**< max attitude rates in acro mode */
