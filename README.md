@@ -26,6 +26,7 @@ scripts/make-vm.sh             # mkqnximage -> ~/qnx-vm-px4
 scripts/run-vm.sh              # boot headless, ssh on localhost:2222
 scripts/deploy.sh              # stripped px4 + ROMFS into /data/px4 in the VM
 scripts/px4-vm.sh start        # PX4 SIH quad, MAVLink to the host at 10.0.2.2
+scripts/vm-ssh.sh cat /dev/px4/state   # live state from PX4's QNX resource manager
 ```
 
 QGroundControl on the host picks up the vehicle on UDP 14550. MAVSDK uses UDP 14540.
@@ -42,20 +43,31 @@ tests/run-all.sh
 | `tests/test_priorities.sh` | every PX4 thread at priority 1..253, `wq:rate_ctrl` highest, work queues `SCHED_FIFO` and ordered |
 | `tests/test_hrt.sh` | `hrt_absolute_time()` vs `CLOCK_MONOTONIC` over 11 s: no backward steps, drift < 1 ms |
 | `tests/test_params_persist.sh` | a parameter survives a PX4 restart |
+| `tests/test_resmgr.sh` | `cat /dev/px4/state` (QNX resource manager in PX4): fields, live, read-only, low priority |
+| `tests/test_fault_isolation.sh` | mid-mission, a separate process hogs CPU + 512 MiB and segfaults, PX4 logger restarted: mission completes, PX4 untouched, core file written |
 | `tests/test_flight.py` | MAVSDK: arm, takeoff 10 m, 10 s hold within ±1 m, 4-waypoint mission, land, disarm. Also passes on Linux SITL. |
 
 ## Results
 
-See [docs/results.md](docs/results.md). Short version: with 2x-oversubscribed CPU load, stock Linux SITL lost 36% of rate-controller updates; on QNX the update count stayed the same, even with the load at FIFO priority 200, because PX4's control threads hold priorities 239 to 253.
+See [docs/results.md](docs/results.md). Short version: with 2x-oversubscribed CPU load, stock Linux SITL lost 23% of rate-controller updates and had a 21 ms gap. On QNX the 800 Hz rate loop did not change, even with the load at FIFO priority 200, because PX4's control threads hold priorities 239 to 253.
+
+![timing](docs/img/timing.png)
+
+Reproduce everything from an empty directory: `scripts/fresh-clone-test.sh`.
 
 ## Docs
 
 - [docs/porting-notes.md](docs/porting-notes.md): every change, why, and every stub
 - [docs/module-baseline.md](docs/module-baseline.md): what SIH flight needs, from Linux SITL
+- [docs/architecture.md](docs/architecture.md): how PX4 maps onto QNX
+- [docs/qnx-evidence.md](docs/qnx-evidence.md): QNX features used, with files and proofs
+- Codelab: [codelab/px4-sih-on-qnx](codelab/px4-sih-on-qnx/px4-sih-on-qnx.md) (rendered: `docs/codelab-site/`, built with `codelab/build.sh`)
+- Upstream: PR draft in [docs/upstream-pr.md](docs/upstream-pr.md). PR URL: _to be added_
 
 ## Known limits
 
-- QNX timers use the 1 ms system tick, so loop jitter on QNX idle is higher than on Linux idle (see results).
+- QNX normal timers round to the kernel tick; the VM boots with a 10 kHz tick (`procnto -C 10000`). With the default 1 kHz tick, loop jitter is about 6x higher.
+- HAM (automatic process restart) is not in the QNX Everywhere image, so the fault test shows isolation, not restart.
 - uXRCE-DDS (ROS 2 bridge) is not built on QNX.
 - Only SIH simulation. No hardware drivers, no Gazebo.
 

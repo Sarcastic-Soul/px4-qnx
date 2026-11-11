@@ -1,0 +1,281 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Fly PX4 Autopilot on QNX 8.0 in QEMU</title>
+
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://qnx.github.io/codelabs/js/codelab-elements.css">
+
+  
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+
+     
+    google-codelab #done {
+      display: none !important;
+    }
+  </style>
+
+</head>
+<body>
+
+  <google-codelab-analytics gaid="UA-49880327-14" ga4id=""></google-codelab-analytics>
+
+  <google-codelab codelab-gaid=""
+                  codelab-ga4id=""
+                  id="px4-sih-on-qnx"
+                  title="Fly PX4 Autopilot on QNX 8.0 in QEMU"
+                  environment="web"
+                  feedback-link="https://github.com/Sarcastic-Soul/px4-qnx/issues">
+    
+      <google-codelab-step label="Overview" duration="2">
+        <p><a href="https://px4.io" target="_blank">PX4</a> is an open-source flight controller used on drones, VTOLs and rovers. It normally runs on NuttX (flight boards) or Linux. In this codelab you run PX4 v1.17.0 on <strong>QNX 8.0</strong> inside a QEMU virtual machine and fly it with PX4&#39;s built-in <strong>SIH</strong> simulator.</p>
+<h2 is-upgraded>What you&#39;ll do</h2>
+<ul>
+<li>Cross-compile PX4 with the QNX <code>qcc</code> toolchain</li>
+<li>Build and boot a QNX 8.0 x86_64 VM with <code>mkqnximage</code></li>
+<li>Start PX4 in the VM and fly a mission from QGroundControl (or an automated MAVSDK script)</li>
+<li>Check PX4&#39;s thread priorities with <code>pidin</code></li>
+<li>Load the CPU and watch the rate controller keep its 800 Hz</li>
+<li>Read live vehicle state from a QNX resource manager with <code>cat /dev/px4/state</code></li>
+</ul>
+<h2 is-upgraded>What you&#39;ll need</h2>
+<ul>
+<li>A Linux x86_64 host with KVM (<code>ls /dev/kvm</code>), 8 GB RAM, about 15 GB free disk</li>
+<li>QNX SDP 8.0 with a non-commercial QNX Everywhere license (see the <a href="https://qnx.github.io/codelabs/get-non-commercial-qnx-license/" target="_blank">license codelab</a>)</li>
+<li><code>git</code>, <code>cmake</code>, <code>ninja</code>, <code>qemu-system-x86_64</code>, <a href="https://docs.astral.sh/uv/" target="_blank">uv</a></li>
+<li>Optional: <a href="https://qgroundcontrol.com" target="_blank">QGroundControl</a></li>
+</ul>
+<p>All scripts used here are in the <a href="https://github.com/Sarcastic-Soul/px4-qnx" target="_blank">px4-qnx</a> repo.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Get the code" duration="10">
+        <p>Clone the port repo. It holds only patches and scripts. Upstream PX4 is fetched separately.</p>
+<pre><code language="language-bash" class="language-bash">mkdir -p ~/px4ws &amp;&amp; cd ~/px4ws
+git clone https://github.com/Sarcastic-Soul/px4-qnx.git
+cd px4-qnx
+</code></pre>
+<p>Fetch PX4 v1.17.0 with submodules (this takes a while), then apply the QNX patches:</p>
+<pre><code language="language-bash" class="language-bash">scripts/fetch-upstream.sh     # -&gt; ../work/PX4-Autopilot, branch qnx-port
+scripts/apply-patches.sh      # git am patches/*.patch
+</code></pre>
+<p>Expected output ends with the five patch titles, for example:</p>
+<pre><code>posix: add QNX 8.0 toolchain, platform detection and qnx_sitl board
+...
+qnx: /dev/px4/state resource manager module
+</code></pre>
+<p>Create the Python environment PX4 uses for code generation:</p>
+<pre><code language="language-bash" class="language-bash">scripts/setup-venv.sh
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Build PX4 for QNX" duration="10">
+        <p>PX4&#39;s code generators (uORB messages, parameters, MAVLink) run on the host with Python. Only the C/C++ is cross-compiled. <code>scripts/build.sh</code> sources <code>qnxsdp-env.sh</code>, points CMake at the QNX toolchain file, and builds the <code>qnx_sitl_default</code> board.</p>
+<pre><code language="language-bash" class="language-bash">scripts/build.sh
+</code></pre>
+<p>Negative : <code>qnxsdp-env.sh</code> only works in <strong>bash</strong>. The script runs it in bash for you. It also sets <code>TMPDIR</code> to <code>~/qnx-vm/.tmp</code>, because <code>qcc</code> writes large temp files and some hosts mount <code>/tmp</code> with a small quota.</p>
+<p>At the end you should see a QNX binary:</p>
+<pre><code>build/qnx_sitl_default/bin/px4: ELF 64-bit LSB pie executable, x86-64, ...
+  dynamically linked, interpreter /usr/lib/ldqnx-64.so.2, with debug_info
+</code></pre>
+<h2 is-upgraded>What the patches change</h2>
+<p>PX4 already has a POSIX layer for Linux and macOS. The port adds a <code>__PX4_QNX</code> path to it:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p>Area</p>
+</td><td colspan="1" rowspan="1"><p>Change</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p>Build</p>
+</td><td colspan="1" rowspan="1"><p><code>Toolchain-qnx-x86_64.cmake</code> (<code>qcc</code>/<code>q++</code>), link <code>libsocket</code></p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p>Headers</p>
+</td><td colspan="1" rowspan="1"><p>QNX has <code>statvfs</code> but no <code>statfs</code>, and no <code>dirent::d_type</code>. Small wrappers cover both</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p>Priorities</p>
+</td><td colspan="1" rowspan="1"><p>QNX 8.0 reserves priorities 254 and 255. PX4&#39;s maximum is capped at 253</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p>Threads</p>
+</td><td colspan="1" rowspan="1"><p>QNX threads <strong>inherit</strong> the creator&#39;s scheduling by default, so PX4 now sets <code>PTHREAD_EXPLICIT_SCHED</code></p>
+</td></tr>
+</table>
+<p>Positive : Without the <code>PTHREAD_EXPLICIT_SCHED</code> fix, every PX4 work queue silently ran at the same priority (253). Always check with <code>pidin</code> after porting a threaded app to QNX.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Build and boot the QNX VM" duration="8">
+        <p><code>scripts/make-vm.sh</code> calls <code>mkqnximage</code> to build a QEMU x86_64 image with 4 vCPUs, 2 GB RAM, a 1 GB <code>/data</code> partition and your ssh key for root login.</p>
+<pre><code language="language-bash" class="language-bash">ssh-keygen -q -t ed25519 -N &#39;&#39; -f ~/.ssh/id_ed25519_qnx   # skip if you have it
+scripts/make-vm.sh
+</code></pre>
+<p>It also passes <code>-C 10000</code> to the kernel (<code>procnto</code>), which sets a 10 kHz system tick:</p>
+<pre><code language="language-bash" class="language-bash">grep procnto ~/qnx-vm-px4/output/build/ifs.build
+# ... procnto-smp-instr -mr -d 0777 -u 0777  -C 10000
+</code></pre>
+<p>Negative : QNX 8.0 is tickless, but normal timers (<code>nanosleep</code>, condition-variable timeouts) still round to the tick. With the default 1 kHz tick, PX4&#39;s 800 Hz loop runs in 1 ms and 2 ms steps. 10 kHz removes most of that jitter.</p>
+<p>Boot it headless and copy PX4 in:</p>
+<pre><code language="language-bash" class="language-bash">scripts/run-vm.sh        # waits until ssh on localhost:2222 answers
+scripts/deploy.sh        # stripped px4 + ROMFS -&gt; /data/px4
+scripts/vm-ssh.sh uname -a
+</code></pre>
+<pre><code>QNX px4-qnx 8.0.0 2026/06/05-16:26:03EDT x86pc x86_64
+</code></pre>
+<p>The VM&#39;s root filesystem is a read-only boot image, so PX4 lives on <code>/data/px4</code>.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Start PX4 on QNX" duration="3">
+        <pre><code language="language-bash" class="language-bash">scripts/px4-vm.sh start --clean
+scripts/px4-vm.sh log | tail -5
+</code></pre>
+<pre><code>INFO  [qnx_state_resmgr] serving vehicle state at /dev/px4/state
+INFO  [px4] Startup script returned successfully
+INFO  [commander] Ready for takeoff!
+</code></pre>
+<p><code>px4-vm.sh</code> starts PX4 with <code>PX4_MAVLINK_PARTNER_IP=10.0.2.2</code>. That is the host as seen from a QEMU user-NAT guest, so MAVLink reaches the host with no port forwarding.</p>
+<p>Run PX4 shell commands through the same script:</p>
+<pre><code language="language-bash" class="language-bash">scripts/px4-vm.sh cmd commander status
+scripts/px4-vm.sh cmd work_queue status
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Fly it" duration="5">
+        <h2 is-upgraded>With QGroundControl</h2>
+<p>Start QGroundControl on the host. It listens on UDP 14550 and the vehicle appears within a few seconds. Arm, take off, upload a mission and fly it like any PX4 vehicle.</p>
+<h2 is-upgraded>Automated, with MAVSDK</h2>
+<pre><code language="language-bash" class="language-bash">../work/venv/bin/python tests/test_flight.py
+</code></pre>
+<pre><code>[test_flight] armed
+[test_flight] hold: 300 samples, alt min 9.95 max 10.10
+[test_flight]   mission 4/4
+[test_flight] landed
+[test_flight] PASS
+</code></pre>
+<p>The script arms, takes off to 10 m, checks the hold stays within ±1 m, flies a 20 m square mission, lands and disarms.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Look at the priorities" duration="3">
+        <pre><code language="language-bash" class="language-bash">scripts/vm-ssh.sh &#34;pidin -p px4 -F &#39;%h %p&#39;&#34;
+</code></pre>
+<pre><code>wq:rate_ctrl          253f
+:nav_and_controllers  240f
+wq:INS0               239f
+wq:hp_default         235f
+logger                228f
+wq:lp_default         203f
+mavlink_rcv_if0       173f
+commander             167f
+log_writer_file        87f
+</code></pre>
+<p><code>f</code> means <code>SCHED_FIFO</code>. The rate controller is at the top, then the attitude/position controllers and the EKF, with logging near the bottom. A normal QNX program (like your shell) runs at priority 10.</p>
+<pre><code language="language-bash" class="language-bash">tests/test_priorities.sh
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Load the CPU" duration="5">
+        <p>Run 8 busy threads (2x the VM&#39;s CPUs) next to PX4 and measure the rate controller for 30 s:</p>
+<pre><code language="language-bash" class="language-bash">bench/run_timing_qnx.sh                    # load at priority 10
+HOG_PRIO=200f bench/run_timing_qnx.sh qnx-200   # load at FIFO priority 200
+</code></pre>
+<pre><code>{&#34;label&#34;: &#34;qnx idle&#34;, &#34;events&#34;: 24098, &#34;avg_us&#34;: 1249.95, &#34;max_us&#34;: 1566, ...}
+{&#34;label&#34;: &#34;qnx hog 8x prio 10&#34;, &#34;events&#34;: 24006, &#34;avg_us&#34;: 1249.95, &#34;max_us&#34;: 1438, ...}
+</code></pre>
+<p>The rate controller stays at about 24000 updates per 30 s (800 Hz) with or without the load. For comparison, <code>bench/run_timing_linux.sh</code> runs the same test against stock Linux SITL on the host. There it dropped to 18577 updates with a 21 ms gap, because unprivileged Linux SITL can&#39;t use real-time priorities.</p>
+<p class="image-container"><img alt="Rate controller updates: Linux SITL vs QNX under load" src="img/7f57f941f07877cf.png"></p>
+<p>Try <code>HOG_PRIO=245f</code>. Now the load is <strong>above</strong> the EKF (239), and the script reports <code>ekf2 updates: ... hog 1</code>. Strict priorities do exactly what you set. Choosing them is a design decision.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Read vehicle state from any QNX process" duration="3">
+        <p>The port adds a small PX4 module that is a QNX <strong>resource manager</strong>. It registers <code>/dev/px4/state</code> with the process manager, so any program can read live state with plain file I/O:</p>
+<pre><code language="language-bash" class="language-bash">scripts/vm-ssh.sh cat /dev/px4/state
+</code></pre>
+<pre><code>t_us=2112350094 armed=0 nav_state=4 x=-0.08 y=-0.07 alt=-0.29 vx=-0.05 ... battery=1.00
+</code></pre>
+<p>The core of it is a few calls:</p>
+<pre><code language="language-cpp" class="language-cpp">dispatch_t *dpp = dispatch_create_channel(-1, DISPATCH_FLAG_NOLOCK);
+iofunc_func_init(_RESMGR_CONNECT_NFUNCS, &amp;connect_funcs, _RESMGR_IO_NFUNCS, &amp;io_funcs);
+connect_funcs.open = io_open;   // takes a uORB snapshot
+io_funcs.read = io_read;        // returns it as text
+iofunc_attr_init(&amp;attr, S_IFCHR | 0444, nullptr, nullptr);
+resmgr_attach(dpp, &amp;rattr, &#34;/dev/px4/state&#34;, _FTYPE_ANY, 0, &amp;connect_funcs, &amp;io_funcs, &amp;attr);
+</code></pre>
+<p>Positive : QNX message passing runs the server thread at the <strong>client&#39;s</strong> priority. A <code>cat</code> at priority 10 is served at 10, so readers can never disturb the control loops. Check it with <code>pidin -p px4 -F '%h %p' | grep qnx_state</code>.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Break something" duration="4">
+        <pre><code language="language-bash" class="language-bash">tests/test_fault_isolation.sh
+</code></pre>
+<p>During a mission, this starts a separate process that takes 8 threads of CPU and 512 MiB of RAM and then segfaults. It also restarts PX4&#39;s logger in flight:</p>
+<pre><code>badapp: crashing now
+Memory fault (core dumped)
+rate controller while badapp ran: 8470 events, 1249.84us avg
+[test_flight] PASS
+PASS: mission completed ... PX4 pid unchanged, core file written
+</code></pre>
+<p>The QNX <code>dumper</code> saved the crashed process&#39;s core in <code>/data/var/dumper</code>, ready for <code>ntox86_64-gdb</code>.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Clean up and next steps" duration="1">
+        <pre><code language="language-bash" class="language-bash">scripts/px4-vm.sh stop
+kill &#34;$(cat ~/qnx-vm-px4/output/qemu.pid)&#34;
+</code></pre>
+<p>You built PX4 with <code>qcc</code>, flew it on QNX 8.0, and saw strict priority scheduling, process isolation and a resource manager at work.</p>
+<h2 is-upgraded>Learn more</h2>
+<ul>
+<li><code>docs/porting-notes.md</code>: every change made for QNX and why</li>
+<li><code>docs/results.md</code>: all measurements and how they were taken</li>
+<li><code>bench/trace_ratectrl.sh</code>: capture a <code>tracelogger</code> kernel trace of the rate controller</li>
+<li><a href="https://www.qnx.com/developers/docs/8.0/com.qnx.doc.neutrino.prog/topic/timing.html" target="_blank">QNX Programmer&#39;s Guide: Understanding the Microkernel&#39;s Concept of Time</a></li>
+</ul>
+
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://qnx.github.io/codelabs/js/native-shim.js"></script>
+  <script src="https://qnx.github.io/codelabs/js/custom-elements.min.js"></script>
+  <script src="https://qnx.github.io/codelabs/js/prettify.js"></script>
+  <script src="https://qnx.github.io/codelabs/js/codelab-elements.js"></script>
+  <script src="//support.google.com/inapp/api.js"></script>
+
+  <script>
+    
+    navigation.addEventListener("navigate", (event) => {
+    const url = new URL(event.destination.url);
+
+    if (url.pathname == "/") {
+      window.location.href = "https://qnx.github.io/codelabs/";
+    }
+  });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "environment": "web",
+  "format": "html",
+  "prefix": "https://storage.googleapis.com",
+  "mainga": "UA-49880327-14",
+  "updated": "2026-11-11T05:29:40+05:30",
+  "id": "px4-sih-on-qnx",
+  "duration": 54,
+  "title": "Fly PX4 Autopilot on QNX 8.0 in QEMU",
+  "authors": "Anish Kumar",
+  "summary": "Build PX4 with qcc, boot it in a QNX 8.0 VM, fly a simulated quadcopter from QGroundControl, and see QNX priorities protect the control loop.",
+  "source": "/home/anish-kumar/Code/Hackathons/Devpost/qnx-global-hackathon/px4-qnx/codelab/px4-sih-on-qnx/px4-sih-on-qnx.md",
+  "theme": "",
+  "status": [
+    "published"
+  ],
+  "category": [
+    "robotics",
+    "porting",
+    "real-time"
+  ],
+  "tags": [
+    "intermediate"
+  ],
+  "feedback": "https://github.com/Sarcastic-Soul/px4-qnx/issues",
+  "url": "px4-sih-on-qnx"
+}
