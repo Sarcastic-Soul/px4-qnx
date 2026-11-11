@@ -201,8 +201,8 @@ HOG_PRIO=200f bench/run_timing_qnx.sh qnx-200   # load at FIFO priority 200
 <pre><code>{&#34;label&#34;: &#34;qnx idle&#34;, &#34;events&#34;: 24098, &#34;avg_us&#34;: 1249.95, &#34;max_us&#34;: 1566, ...}
 {&#34;label&#34;: &#34;qnx hog 8x prio 10&#34;, &#34;events&#34;: 24006, &#34;avg_us&#34;: 1249.95, &#34;max_us&#34;: 1438, ...}
 </code></pre>
-<p>The rate controller stays at about 24000 updates per 30 s (800 Hz) with or without the load. For comparison, <code>bench/run_timing_linux.sh</code> runs the same test against stock Linux SITL on the host. There it dropped to 18577 updates with a 21 ms gap. Unprivileged Linux SITL can&#39;t use real-time priorities, so this is not an RT-Linux comparison.</p>
-<p class="image-container"><img alt="Rate controller updates: Linux SITL vs QNX under load" src="img/7f57f941f07877cf.png"></p>
+<p>The rate controller stays at about 24000 updates per 30 s (800 Hz) with or without the load. For comparison, <code>bench/run_timing_linux.sh</code> runs the same test against stock Linux SITL on the host. There it dropped to 18953 updates with a 28 ms gap. Unprivileged Linux SITL can&#39;t use real-time priorities, so this is not an RT-Linux comparison.</p>
+<p class="image-container"><img alt="Rate controller updates: Linux SITL vs QNX under load" src="img/71bdb5ce8b51a793.png"></p>
 <p>Try <code>HOG_PRIO=245f</code>. Now the load is <strong>above</strong> the EKF (239), and the script reports <code>ekf2 updates: ... hog 1</code>. Strict priorities do exactly what you set. Choosing them is a design decision.</p>
 
 

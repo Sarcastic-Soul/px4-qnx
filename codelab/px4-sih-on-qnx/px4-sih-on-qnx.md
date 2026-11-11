@@ -228,7 +228,7 @@ HOG_PRIO=200f bench/run_timing_qnx.sh qnx-200   # load at FIFO priority 200
 {"label": "qnx hog 8x prio 10", "events": 24006, "avg_us": 1249.95, "max_us": 1438, ...}
 ```
 
-The rate controller stays at about 24000 updates per 30 s (800 Hz) with or without the load. For comparison, `bench/run_timing_linux.sh` runs the same test against stock Linux SITL on the host. There it dropped to 18577 updates with a 21 ms gap. Unprivileged Linux SITL can't use real-time priorities, so this is not an RT-Linux comparison.
+The rate controller stays at about 24000 updates per 30 s (800 Hz) with or without the load. For comparison, `bench/run_timing_linux.sh` runs the same test against stock Linux SITL on the host. There it dropped to 18953 updates with a 28 ms gap. Unprivileged Linux SITL can't use real-time priorities, so this is not an RT-Linux comparison.
 
 ![Rate controller updates: Linux SITL vs QNX under load](timing.png)
 

@@ -49,7 +49,7 @@ tests/run-all.sh
 
 ## Results
 
-See [docs/results.md](docs/results.md). Short version: with 2x-oversubscribed CPU load, stock Linux SITL (run as a normal user, so without real-time priorities; RT Linux not measured) lost 23% of rate-controller updates and had a 21 ms gap. On QNX the 800 Hz rate loop did not change. With the load at FIFO priority 200 the rate, attitude and EKF loops (239–253) were still unaffected, while lower-priority PX4 tasks (commander, navigator, MAVLink) were starved, exactly as strict priorities dictate.
+See [docs/results.md](docs/results.md). Short version: with 2x-oversubscribed CPU load, stock Linux SITL (run as a normal user, so without real-time priorities; RT Linux not measured) lost 21% of rate-controller updates and had a 28 ms gap. On QNX the 800 Hz rate loop did not change. With the load at FIFO priority 200 the rate, attitude and EKF loops (239–253) were still unaffected, while lower-priority PX4 tasks (commander, navigator, MAVLink) were starved, exactly as strict priorities dictate.
 
 ![timing](docs/img/timing.png)
 

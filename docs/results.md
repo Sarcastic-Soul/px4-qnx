@@ -12,8 +12,8 @@ Scripts: `bench/run_timing_qnx.sh` (`HOG_PRIO=10|200f|245f`), `bench/run_timing_
 
 | Run | Updates in 30 s | Mean | Worst gap | Std dev |
 |---|---|---|---|---|
-| Linux SITL, idle | 24004 | 1250 us | 1.6 ms | 49 us |
-| Linux SITL, 24 busy threads (2x host CPUs) | 18577 | 1617 us | 21.0 ms | 1476 us |
+| Linux SITL, idle | 24003 | 1250 us | 2.8 ms | 78 us |
+| Linux SITL, 24 busy threads (2x host CPUs) | 18953 | 1584 us | 28.0 ms | 1446 us |
 | QNX, idle (3 runs) | 24095–24098 | 1250 us | 1.6–2.2 ms | 73–80 us |
 | QNX, 8 busy threads (2x vCPUs) at prio 10 | 24006 | 1250 us | 1.4 ms | 51 us |
 | QNX, 8 busy threads at prio 200 FIFO | 24037 | 1250 us | 1.4 ms | 50 us |
@@ -21,7 +21,7 @@ Scripts: `bench/run_timing_qnx.sh` (`HOG_PRIO=10|200f|245f`), `bench/run_timing_
 
 What this shows:
 
-- Under load, Linux SITL lost 23% of rate-controller updates and had a 21 ms gap. Stock Linux SITL runs as a normal user, so PX4's `SCHED_FIFO` requests fail (`EPERM`) and its threads share the CPU with the load as equals.
+- Under load, Linux SITL lost 21% of rate-controller updates and had a 28 ms gap. Stock Linux SITL runs as a normal user, so PX4's `SCHED_FIFO` requests fail (`EPERM`) and its threads share the CPU with the load as equals.
 - On QNX the update count and worst gap did not change under load. Even busy threads at FIFO priority 200 or 245 did not move the rate loop, because `wq:rate_ctrl` runs at 253.
 - At prio 200 the load is above PX4's non-control tasks. In `bench/results/qnx-hog-prio200-hog-perf.txt` (30 s) commander ran 6 cycles, navigator 2, and each MAVLink sender 29 with a 30 s worst gap. Rate, attitude and EKF loops were unaffected, but the GCS link and failsafe logic were stalled for the whole phase. At prio 10 (a normal QNX program) nothing in PX4 was affected.
 - The idle rows are noisier than the hog rows (std dev 73–80 us vs about 50 us, and the prio-200 run's idle phase had a 2.2 ms worst gap). Likely cause: idle vCPUs halt and wake through KVM, and busy vCPUs don't. So "did not change under load" partly reflects a noisy idle baseline.

@@ -1,2 +1,2 @@
-{"label": "linux idle", "events": 24004, "avg_us": 1249.95, "min_us": 968, "max_us": 1605, "std_us": 49.266}
-{"label": "linux hog 24x", "events": 18577, "avg_us": 1617.38, "min_us": 5, "max_us": 21005, "std_us": 1475.600}
+{"label": "linux idle", "events": 24003, "avg_us": 1250.00, "min_us": 860, "max_us": 2844, "std_us": 77.856}
+{"label": "linux hog 24x", "events": 18953, "avg_us": 1583.92, "min_us": 8, "max_us": 27998, "std_us": 1445.776}

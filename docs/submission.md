@@ -63,7 +63,7 @@ QNX resource manager: the PX4 module qnx_state_resmgr (ChannelCreate with _NTO_C
 
 System analysis: tracelogger/traceprinter capture of the rate-controller thread (bench/trace_ratectrl.sh). Process isolation plus dumper core files during a mission (tests/test_fault_isolation.sh). pidin, on -p, slog2info and ntox86_64-gdb were used throughout.
 
-Result: under 2x CPU overload, stock Linux SITL (unprivileged, no real-time priorities) lost 23% of rate-controller updates. On QNX the 800 Hz rate loop was unchanged, including with the load at FIFO priority 200, where only lower-priority PX4 tasks were starved, as designed (docs/results.md, bench/). Full map of files and demo timestamps: docs/qnx-evidence.md.
+Result: under 2x CPU overload, stock Linux SITL (unprivileged, no real-time priorities) lost 21% of rate-controller updates. On QNX the 800 Hz rate loop was unchanged, including with the load at FIFO priority 200, where only lower-priority PX4 tasks were starved, as designed (docs/results.md, bench/). Full map of files and demo timestamps: docs/qnx-evidence.md.
 
 Pull request URL:
 
