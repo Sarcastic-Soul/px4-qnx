@@ -5,7 +5,7 @@ Target 2:45. Screen recording at 1080p, voice-over, no copyrighted music. Each s
 | Time | On screen | Say |
 |---|---|---|
 | 0:00–0:15 | Title card: "PX4 Autopilot on QNX 8.0" + repo URL | "PX4 is the open-source autopilot behind many drones. It runs on NuttX and Linux. I ported it to QNX 8.0." |
-| 0:15–0:30 | Terminal: `scripts/build.sh` tail showing `ELF ... ldqnx-64.so.2`, then `git -C ../work/PX4-Autopilot log --oneline v1.17.0..` | "Same PX4 v1.17.0 source plus five small patches. It builds with qcc and adds a QNX path to PX4's POSIX layer. No fork of the platform." |
+| 0:15–0:30 | Terminal: `scripts/build.sh` tail showing `ELF ... ldqnx-64.so.2`, then `git -C ../work/PX4-Autopilot log --oneline v1.17.0..` | "Same PX4 v1.17.0 source plus six small patches. It builds with qcc and adds a QNX path to PX4's POSIX layer. No fork of the platform." |
 | 0:30–0:45 | `scripts/run-vm.sh`, `scripts/vm-ssh.sh uname -a`, `scripts/px4-vm.sh start` and `log` showing "Ready for takeoff" | "A QNX 8.0 VM in QEMU. PX4 boots its normal startup script with the built-in SIH simulator." |
 | 0:45–1:15 | QGroundControl: vehicle appears, take off, fly the mission (speed up 4x) | "QGroundControl on the host sees it right away. Arm, take off, fly a mission. The same flight runs as an automated test." |
 | 1:15–1:35 | `scripts/vm-ssh.sh "pidin -p px4 -F '%h %p'"` | "Every PX4 thread gets a real QNX FIFO priority. Rate controller at 253, estimator 239, logging near the bottom. Getting this right needed one QNX-specific fix: threads inherit their creator's priority unless told otherwise." |

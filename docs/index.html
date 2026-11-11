@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PX4 Autopilot on QNX 8.0</title>
+<meta name="description" content="PX4 Autopilot ported to QNX 8.0: built with qcc, flies a simulated quadcopter in a QEMU VM, keeps its 800 Hz control loop under CPU overload. Patches, tests, results and codelabs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f2ec;
+    --paper: #fbf9f5;
+    --ink: #1d1b18;
+    --ink-2: #4a463f;
+    --rule: #d9d3c7;
+    --accent: #b8460f;
+    --accent-ink: #8f3609;
+    --term: #1f1d1a;
+    --term-ink: #e9e4da;
+    --term-dim: #9b9488;
+    --display: "Space Grotesk", "IBM Plex Sans", sans-serif;
+    --body: "IBM Plex Sans", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 17px/1.6 var(--body);
+  }
+  a { color: var(--accent-ink); text-underline-offset: 3px; }
+  a:hover { color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  code, pre { font-family: var(--mono); }
+  code { font-size: .92em; background: #ebe6dc; padding: .08em .35em; border-radius: 3px; }
+
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus { left: 1rem; top: 1rem; background: var(--paper); padding: .5rem 1rem; z-index: 10; }
+
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 28px; }
+
+  header.top {
+    border-bottom: 1px solid var(--rule);
+  }
+  header.top .wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    min-height: 64px; gap: 1rem; flex-wrap: wrap;
+  }
+  .mark { font: 500 15px var(--mono); color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
+  .mark span { color: var(--accent); }
+  nav ul { list-style: none; display: flex; gap: 4px; margin: 0; padding: 0; flex-wrap: wrap; }
+  nav a {
+    display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px;
+    color: var(--ink-2); text-decoration: none; font-weight: 500; font-size: 15px;
+  }
+  nav a:hover { color: var(--ink); }
+
+  /* hero */
+  .hero { padding: 72px 0 56px; }
+  .hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: start; }
+  .hero h1 {
+    font: 700 clamp(44px, 6.4vw, 84px)/0.96 var(--display);
+    letter-spacing: -.035em; margin: 0 0 28px;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .lede { font-size: 20px; line-height: 1.5; color: var(--ink-2); max-width: 34ch; margin: 0 0 32px; }
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 0 0 36px; font-size: 15px; }
+  .facts dt { font: 500 13px var(--mono); color: var(--ink-2); text-transform: lowercase; padding-top: 2px; }
+  .facts dd { margin: 0; }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px;
+    font-weight: 600; font-size: 16px; text-decoration: none; border-radius: 4px;
+    border: 1.5px solid var(--ink);
+  }
+  .btn.primary { background: var(--ink); color: var(--paper); }
+  .btn.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); color: var(--paper); }
+  .btn.ghost { color: var(--ink); }
+  .btn.ghost:hover { background: var(--paper); }
+
+  .term {
+    background: var(--term); color: var(--term-ink); border-radius: 6px;
+    font: 400 13.5px/1.65 var(--mono); padding: 18px 20px 20px; overflow-x: auto;
+    margin: 0; transform: rotate(.6deg); box-shadow: 0 18px 40px -24px rgba(29,27,24,.6);
+  }
+  .term .bar { display: flex; justify-content: space-between; color: var(--term-dim); font-size: 12px; margin-bottom: 12px; }
+  .term .p { color: #e8a273; }
+  .term .d { color: var(--term-dim); }
+  .term .hi { color: #f3c6a3; }
+
+  /* numbers */
+  .numbers { background: var(--ink); color: var(--paper); padding: 72px 0; }
+  .numbers .wrap { display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 48px; align-items: end; }
+  .big { font: 700 clamp(64px, 9vw, 128px)/.9 var(--display); letter-spacing: -.04em; margin: 0; }
+  .big.accent { color: #ef8a52; }
+  .numbers .cap { font-size: 16px; color: #cfc8bb; margin: 14px 0 0; max-width: 26ch; }
+  .numbers .note { font-size: 15px; color: #b5ad9f; border-left: 2px solid #ef8a52; padding-left: 18px; margin: 0; }
+  .numbers .note a { color: #f3c6a3; }
+
+  section { padding: 88px 0; }
+  h2 {
+    font: 700 clamp(30px, 3.6vw, 44px)/1.05 var(--display); letter-spacing: -.025em;
+    margin: 0 0 18px;
+  }
+  .kicker { font: 500 13px var(--mono); color: var(--accent-ink); margin: 0 0 14px; }
+  .intro { color: var(--ink-2); max-width: 62ch; margin: 0 0 40px; }
+
+  /* results */
+  .results .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 48px; align-items: start; }
+  figure { margin: 0; }
+  figure img { width: 100%; height: auto; display: block; background: #fff; border: 1px solid var(--rule); border-radius: 4px; }
+  figcaption { font-size: 14px; color: var(--ink-2); margin-top: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font: 500 12.5px var(--mono); color: var(--ink-2); text-transform: lowercase; }
+  td.n { font-family: var(--mono); white-space: nowrap; }
+  tr.bad td.n { color: var(--accent-ink); font-weight: 500; }
+  .more { margin-top: 18px; font-size: 15px; }
+
+  /* qnx features: dense list */
+  .feat { background: var(--paper); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .feat ol { list-style: none; margin: 0; padding: 0; counter-reset: f; display: grid; grid-template-columns: 1fr 1fr; column-gap: 56px; }
+  .feat li { counter-increment: f; padding: 22px 0; border-top: 1px solid var(--rule); display: grid; grid-template-columns: 44px 1fr; }
+  .feat li::before { content: counter(f, decimal-leading-zero); font: 500 13px var(--mono); color: var(--accent-ink); padding-top: 4px; }
+  .feat h3 { font: 600 18px/1.3 var(--body); margin: 0 0 6px; }
+  .feat p { margin: 0; color: var(--ink-2); font-size: 15.5px; }
+
+  /* codelabs */
+  .labs .list { border-top: 2px solid var(--ink); }
+  .lab {
+    display: grid; grid-template-columns: 120px 1fr auto; gap: 28px; align-items: start;
+    padding: 32px 0; border-bottom: 1px solid var(--rule);
+  }
+  .lab .meta { font: 500 13px/1.8 var(--mono); color: var(--ink-2); }
+  .lab .meta b { display: block; font: 700 34px/1 var(--display); color: var(--ink); letter-spacing: -.02em; margin-bottom: 6px; }
+  .lab h3 { font: 700 24px/1.2 var(--display); letter-spacing: -.015em; margin: 0 0 10px; }
+  .lab h3 a { color: var(--ink); text-decoration: none; }
+  .lab h3 a:hover { color: var(--accent-ink); text-decoration: underline; }
+  .lab p { margin: 0 0 12px; color: var(--ink-2); max-width: 64ch; }
+  .lab .tags { font: 400 13px var(--mono); color: var(--ink-2); margin: 0; }
+  .lab .go { align-self: center; }
+
+  /* reproduce */
+  .repro .grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 56px; align-items: start; }
+  .repro pre.term { transform: none; }
+  .repro ul { padding-left: 1.1em; color: var(--ink-2); }
+  .repro li { margin-bottom: 6px; }
+
+  footer { border-top: 1px solid var(--rule); padding: 36px 0 48px; font-size: 14.5px; color: var(--ink-2); }
+  footer .wrap { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  footer p { margin: 0; }
+
+  @media (max-width: 900px) {
+    .hero .wrap, .results .grid, .repro .grid { grid-template-columns: 1fr; gap: 40px; }
+    .numbers .wrap { grid-template-columns: 1fr 1fr; }
+    .numbers .note { grid-column: 1 / -1; }
+    .feat ol { grid-template-columns: 1fr; }
+    .lab { grid-template-columns: 1fr; gap: 14px; }
+    .lab .meta b { display: inline; font-size: 22px; margin-right: 10px; }
+    .term { transform: none; }
+  }
+  @media (max-width: 520px) {
+    body { font-size: 16px; }
+    .wrap { padding: 0 20px; }
+    .hero { padding: 44px 0 40px; }
+    section { padding: 64px 0; }
+    .numbers .wrap { grid-template-columns: 1fr; gap: 32px; }
+    .term { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="./">px4<span>/</span>qnx</a>
+    <nav aria-label="Main">
+      <ul>
+        <li><a href="#results">Results</a></li>
+        <li><a href="#qnx">QNX features</a></li>
+        <li><a href="#codelabs">Codelabs</a></li>
+        <li><a href="#run">Run it</a></li>
+        <li><a href="https://github.com/Sarcastic-Soul/px4-qnx">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <h1>PX4 Autopilot,<br>on <em>QNX&nbsp;8.0</em>.</h1>
+        <p class="lede">The open-source drone autopilot, built with <code>qcc</code>, flying a simulated quadcopter inside a QNX virtual machine. Six patches on PX4 v1.17.0, no fork of the platform.</p>
+        <dl class="facts">
+          <dt>upstream</dt><dd><a href="https://github.com/PX4/PX4-Autopilot">PX4/PX4-Autopilot</a>, tag v1.17.0</dd>
+          <dt>target</dt><dd>QNX SDP 8.0.5, QEMU x86_64 with KVM</dd>
+          <dt>toolchain</dt><dd>qcc / q++ 12.2.0, CMake, Ninja</dd>
+          <dt>tests</dt><dd>7 automated checks, including a full MAVSDK mission</dd>
+          <dt>license</dt><dd>BSD-3-Clause, same as PX4</dd>
+        </dl>
+        <div class="actions">
+          <a class="btn primary" href="#codelabs">Start a codelab</a>
+          <a class="btn ghost" href="https://github.com/Sarcastic-Soul/px4-qnx">View the code</a>
+        </div>
+      </div>
+
+      <pre class="term" aria-label="Terminal output from the QNX VM"><div class="bar"><span>root@px4-qnx (QNX 8.0.0)</span><span>ssh :2222</span></div><span class="p">#</span> pidin -p px4 -F '%h %p'
+wq:rate_ctrl          <span class="hi">253f</span>
+:nav_and_controllers  240f
+wq:INS0               239f
+wq:hp_default         235f
+logger                228f
+wq:lp_default         203f
+commander             167f
+log_writer_file        87f
+
+<span class="p">#</span> cat /dev/px4/state
+<span class="d">t_us=2112350094 armed=0 nav_state=4</span>
+<span class="d">x=-0.08 y=-0.07 alt=-0.29 vx=-0.05</span>
+<span class="d">heading_deg=0.1 pos_valid=1 battery=1.00</span>
+
+<span class="p">$</span> tests/run-all.sh
+<span class="d">[test_flight]   mission 4/4</span>
+<span class="d">[test_flight] landed</span>
+ALL TESTS PASSED</pre>
+    </div>
+  </div>
+
+  <div class="numbers" aria-labelledby="numbers-h">
+    <h2 id="numbers-h" class="skip">Key numbers</h2>
+    <div class="wrap">
+      <div>
+        <p class="big accent">21%</p>
+        <p class="cap">of rate-controller updates lost by stock Linux SITL under 2x CPU overload.</p>
+      </div>
+      <div>
+        <p class="big">0</p>
+        <p class="cap">lost on QNX, with the same load at priority 10, 200 or 245.</p>
+      </div>
+      <p class="note">Same PX4 source, same host, 30 s per run, 800 Hz target. Linux SITL runs unprivileged, so without real-time priorities; RT Linux was not measured. Every number on this page comes from a script in <a href="https://github.com/Sarcastic-Soul/px4-qnx/tree/main/bench">bench/</a> or <a href="https://github.com/Sarcastic-Soul/px4-qnx/tree/main/tests">tests/</a>.</p>
+    </div>
+  </div>
+
+  <section id="results" class="results" aria-labelledby="results-h">
+    <div class="wrap">
+      <p class="kicker">results</p>
+      <h2 id="results-h">The control loop under load</h2>
+      <p class="intro">Time between <code>mc_rate_control</code> updates, read from a PX4 perf counter. Eight busy threads (twice the VM's CPUs) run next to PX4 on QNX; 24 (twice the host's CPUs) next to Linux SITL.</p>
+      <div class="grid">
+        <figure>
+          <img src="img/timing.png" width="1210" height="770" alt="Histogram of rate-controller update intervals. Linux SITL under load spreads out to 28 ms; QNX idle and under load stay in a narrow peak at 1.25 ms.">
+          <figcaption>Rate-controller interval, Linux SITL vs QNX, idle and loaded. From <code>bench/plot_timing.py</code>.</figcaption>
+        </figure>
+        <div>
+          <table>
+            <thead><tr><th scope="col">Run (30 s)</th><th scope="col">Updates</th><th scope="col">Worst gap</th></tr></thead>
+            <tbody>
+              <tr><td>Linux SITL, idle</td><td class="n">24003</td><td class="n">2.8 ms</td></tr>
+              <tr class="bad"><td>Linux SITL, 2x overload</td><td class="n">18953</td><td class="n">28.0 ms</td></tr>
+              <tr><td>QNX, idle</td><td class="n">24095</td><td class="n">1.6 ms</td></tr>
+              <tr><td>QNX, 2x overload at prio 10</td><td class="n">24006</td><td class="n">1.4 ms</td></tr>
+              <tr><td>QNX, 2x overload at FIFO 200</td><td class="n">24037</td><td class="n">1.4 ms</td></tr>
+              <tr><td>QNX, 2x overload at FIFO 245</td><td class="n">24015</td><td class="n">1.5 ms</td></tr>
+            </tbody>
+          </table>
+          <p class="more">With the load at FIFO 245, above EKF2 (239), the estimator ran once in 30 s. Strict priorities do what you set, so choosing them is a design decision. A kernel trace shows the rate-controller thread gets a CPU a median 2.6&nbsp;µs after it becomes ready. <a href="https://github.com/Sarcastic-Soul/px4-qnx/blob/main/docs/results.md">All results and caveats</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="qnx" class="feat" aria-labelledby="qnx-h">
+    <div class="wrap">
+      <p class="kicker">what the port uses</p>
+      <h2 id="qnx-h">QNX features, and where to find them</h2>
+      <p class="intro">PX4's POSIX layer got a <code>__PX4_QNX</code> path, the same way it already handles macOS. The interesting parts are where QNX differs from Linux.</p>
+      <ol>
+        <li><div><h3>Real priorities, 1 to 253</h3><p>QNX 8.0 reserves 254 and 255. PX4's range is capped and every thread runs <code>SCHED_FIFO</code>. Checked by <code>tests/test_priorities.sh</code>.</p></div></li>
+        <li><div><h3>Explicit scheduling fix</h3><p>Threads inherit their creator's scheduling unless <code>PTHREAD_EXPLICIT_SCHED</code> is set. Before the fix every work queue silently ran at 253.</p></div></li>
+        <li><div><h3>A resource manager inside PX4</h3><p><code>/dev/px4/state</code> serves live vehicle state to any QNX process. Built on <code>resmgr_attach</code>, <code>iofunc_*</code> and per-open OCBs.</p></div></li>
+        <li><div><h3>Fixed-priority channel</h3><p><code>_NTO_CHF_FIXED_PRIORITY</code> keeps the state server at 97 even for a FIFO-253 reader, so it never runs above the flight controller.</p></div></li>
+        <li><div><h3>10 kHz kernel tick</h3><p>Timers round to the tick. Booting <code>procnto -C 10000</code> through <code>mkqnximage</code> cut loop jitter about 6x, with no PX4 change.</p></div></li>
+        <li><div><h3>Process isolation and dumper</h3><p>Mid-mission, a separate process hogs CPU and 512 MiB, then segfaults. The mission completes and QNX saves a core file.</p></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="codelabs" class="labs" aria-labelledby="labs-h">
+    <div class="wrap">
+      <p class="kicker">codelabs</p>
+      <h2 id="labs-h">Learn it hands-on</h2>
+      <p class="intro">Step-by-step tutorials in the QNX Codelabs format. Every command and output in them was run on QNX 8.0, and each has a script that checks it.</p>
+      <div class="list">
+        <article class="lab">
+          <div class="meta"><b>38</b>min · beginner</div>
+          <div>
+            <h3><a href="codelab-site/qnx-resmgr-priority/">Write a QNX 8.0 resource manager and control its priority</a></h3>
+            <p>Build <code>/dev/prio</code> in about 150 lines of C, then measure how message passing hands the client's priority to the server. See a 1 kHz loop lose 200 ms to inheritance, and a fixed-priority server cause a 1.7 s priority inversion. No PX4 needed.</p>
+            <p class="tags">resmgr_attach · iofunc · ChannelCreate · _NTO_CHF_FIXED_PRIORITY · on · pidin</p>
+          </div>
+          <a class="btn ghost go" href="codelab-site/qnx-resmgr-priority/" aria-label="Open the resource manager codelab">Open</a>
+        </article>
+        <article class="lab">
+          <div class="meta"><b>54</b>min · intermediate</div>
+          <div>
+            <h3><a href="codelab-site/px4-sih-on-qnx/">Fly PX4 Autopilot on QNX 8.0 in QEMU</a></h3>
+            <p>Cross-compile PX4 with <code>qcc</code>, build a QNX VM with <code>mkqnximage</code>, fly a mission from QGroundControl or MAVSDK, then load the CPU and crash a process mid-flight to see what QNX protects.</p>
+            <p class="tags">qcc · mkqnximage · SCHED_FIFO · tracelogger · dumper · MAVLink</p>
+          </div>
+          <a class="btn ghost go" href="codelab-site/px4-sih-on-qnx/" aria-label="Open the PX4 codelab">Open</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="run" class="repro" aria-labelledby="run-h">
+    <div class="wrap grid">
+      <div>
+        <p class="kicker">reproduce</p>
+        <h2 id="run-h">Run it yourself</h2>
+        <p class="intro">The repo holds only patches, scripts, tests and docs. Upstream PX4 is fetched at the pinned tag.</p>
+        <ul>
+          <li>Linux x86_64 host with KVM</li>
+          <li>QNX SDP 8.0.5 (free non-commercial license)</li>
+          <li>git, CMake, Ninja, QEMU, uv</li>
+          <li>Optional: QGroundControl</li>
+        </ul>
+        <p class="more"><code>scripts/fresh-clone-test.sh</code> runs the whole chain from an empty directory.</p>
+      </div>
+      <pre class="term" aria-label="Build and run commands">scripts/fetch-upstream.sh   <span class="d"># PX4 v1.17.0</span>
+scripts/apply-patches.sh    <span class="d"># 6 QNX patches</span>
+scripts/setup-venv.sh
+scripts/build.sh            <span class="d"># QNX ELF via qcc</span>
+scripts/make-vm.sh          <span class="d"># mkqnximage</span>
+scripts/run-vm.sh
+scripts/deploy.sh
+scripts/px4-vm.sh start     <span class="d"># SIH quad</span>
+tests/run-all.sh            <span class="d"># 7 checks</span></pre>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Built for the QNX Global Hackathon 2026 by Anish Kumar. Code under <a href="https://github.com/Sarcastic-Soul/px4-qnx/blob/main/LICENSE">BSD-3-Clause</a>.</p>
+    <p><a href="https://github.com/Sarcastic-Soul/px4-qnx">Repository</a> · <a href="https://github.com/Sarcastic-Soul/px4-qnx/blob/main/docs/porting-notes.md">Porting notes</a> · <a href="https://github.com/PX4/PX4-Autopilot">PX4 upstream</a></p>
+  </div>
+</footer>
+</body>
+</html>

@@ -12,6 +12,7 @@ Patches live in `patches/` (exported from branch `qnx-port` with `scripts/export
 | 0003 | explicit thread scheduling, SITL defines for the QNX board, MAVLink partner IP |
 | 0004 | `mc_rate_control` interval perf counter |
 | 0005 | `qnx_state_resmgr` module (`/dev/px4/state`) |
+| 0006 | review fixes: fixed-priority resmgr channel, per-open snapshot, work-queue priority cap, resmgr built only on QNX |
 
 ## Build system
 

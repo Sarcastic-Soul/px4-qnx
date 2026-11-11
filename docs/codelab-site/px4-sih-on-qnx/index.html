@@ -72,10 +72,10 @@ cd px4-qnx
 <pre><code language="language-bash" class="language-bash">scripts/fetch-upstream.sh     # -&gt; ../work/PX4-Autopilot, branch qnx-port
 scripts/apply-patches.sh      # git am patches/*.patch
 </code></pre>
-<p>Expected output ends with the five patch titles, for example:</p>
+<p>Expected output ends with the six patch titles, for example:</p>
 <pre><code>posix: add QNX 8.0 toolchain, platform detection and qnx_sitl board
 ...
-qnx: /dev/px4/state resource manager module
+qnx: review fixes (fixed-priority resmgr channel, per-open snapshot, WQ priority cap, QNX-only resmgr build)
 </code></pre>
 <p>Create the Python environment PX4 uses for code generation:</p>
 <pre><code language="language-bash" class="language-bash">scripts/setup-venv.sh
@@ -88,7 +88,8 @@ qnx: /dev/px4/state resource manager module
         <p>PX4&#39;s code generators (uORB messages, parameters, MAVLink) run on the host with Python. Only the C/C++ is cross-compiled. <code>scripts/build.sh</code> sources <code>qnxsdp-env.sh</code>, points CMake at the QNX toolchain file, and builds the <code>qnx_sitl_default</code> board.</p>
 <pre><code language="language-bash" class="language-bash">scripts/build.sh
 </code></pre>
-<p>Negative : <code>qnxsdp-env.sh</code> only works in <strong>bash</strong>. The script runs it in bash for you. It also sets <code>TMPDIR</code> to <code>~/qnx-vm/.tmp</code>, because <code>qcc</code> writes large temp files and some hosts mount <code>/tmp</code> with a small quota.</p>
+<aside class="warning"><p><code>qnxsdp-env.sh</code> only works in <strong>bash</strong>. The script runs it in bash for you. It also sets <code>TMPDIR</code> to <code>~/qnx-vm/.tmp</code>, because <code>qcc</code> writes large temp files and some hosts mount <code>/tmp</code> with a small quota. </p>
+</aside>
 <p>At the end you should see a QNX binary:</p>
 <pre><code>build/qnx_sitl_default/bin/px4: ELF 64-bit LSB pie executable, x86-64, ...
   dynamically linked, interpreter /usr/lib/ldqnx-64.so.2, with debug_info
@@ -112,7 +113,8 @@ qnx: /dev/px4/state resource manager module
 </td><td colspan="1" rowspan="1"><p>QNX threads <strong>inherit</strong> the creator&#39;s scheduling by default, so PX4 now sets <code>PTHREAD_EXPLICIT_SCHED</code></p>
 </td></tr>
 </table>
-<p>Positive : Without the <code>PTHREAD_EXPLICIT_SCHED</code> fix, every PX4 work queue silently ran at the same priority (253). Always check with <code>pidin</code> after porting a threaded app to QNX.</p>
+<aside class="special"><p> Without the <code>PTHREAD_EXPLICIT_SCHED</code> fix, every PX4 work queue silently ran at the same priority (253). Always check with <code>pidin</code> after porting a threaded app to QNX. </p>
+</aside>
 
 
       </google-codelab-step>
@@ -126,7 +128,8 @@ scripts/make-vm.sh
 <pre><code language="language-bash" class="language-bash">grep procnto ~/qnx-vm-px4/output/build/ifs.build
 # ... procnto-smp-instr -mr -d 0777 -u 0777  -C 10000
 </code></pre>
-<p>Negative : QNX 8.0 is tickless, but normal timers (<code>nanosleep</code>, condition-variable timeouts) still round to the tick. With the default 1 kHz tick, PX4&#39;s 800 Hz loop runs in 1 ms and 2 ms steps. 10 kHz removes most of that jitter.</p>
+<aside class="warning"><p> QNX 8.0 is tickless, but normal timers (<code>nanosleep</code>, condition-variable timeouts) still round to the tick. With the default 1 kHz tick, PX4&#39;s 800 Hz loop runs in 1 ms and 2 ms steps. 10 kHz removes most of that jitter. </p>
+</aside>
 <p>Boot it headless and copy PX4 in:</p>
 <pre><code language="language-bash" class="language-bash">scripts/run-vm.sh        # waits until ssh on localhost:2222 answers
 scripts/deploy.sh        # stripped px4 + ROMFS -&gt; /data/px4
@@ -223,7 +226,8 @@ io_funcs.read = io_read;            // returns that OCB&#39;s snapshot as text
 iofunc_attr_init(&amp;attr, S_IFCHR | 0444, nullptr, nullptr);
 resmgr_attach(dpp, &amp;rattr, &#34;/dev/px4/state&#34;, _FTYPE_ANY, 0, &amp;connect_funcs, &amp;io_funcs, &amp;attr);
 </code></pre>
-<p>Positive : By default, QNX message passing runs the server thread at the <strong>client&#39;s</strong> priority, so a real-time reader would lift it. <code>_NTO_CHF_FIXED_PRIORITY</code> turns that off: the server stays at 97, below every control loop. Check it with <code>on -p 200f cat /dev/px4/state</code> and <code>pidin -p px4 -F '%h %p' | grep qnx_state</code>.</p>
+<aside class="special"><p> By default, QNX message passing runs the server thread at the <strong>client&#39;s</strong> priority, so a real-time reader would lift it. <code>_NTO_CHF_FIXED_PRIORITY</code> turns that off: the server stays at 97, below every control loop. Check it with <code>on -p 200f cat /dev/px4/state</code> and <code>pidin -p px4 -F '%h %p' | grep qnx_state</code>. </p>
+</aside>
 
 
       </google-codelab-step>

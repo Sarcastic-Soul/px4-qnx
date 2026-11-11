@@ -61,7 +61,9 @@ Reproduce everything from an empty directory: `scripts/fresh-clone-test.sh`.
 - [docs/module-baseline.md](docs/module-baseline.md): what SIH flight needs, from Linux SITL
 - [docs/architecture.md](docs/architecture.md): how PX4 maps onto QNX
 - [docs/qnx-evidence.md](docs/qnx-evidence.md): QNX features used, with files and proofs
-- Codelab: [codelab/px4-sih-on-qnx](codelab/px4-sih-on-qnx/px4-sih-on-qnx.md) (rendered: `docs/codelab-site/`, built with `codelab/build.sh`)
+- Project site and codelabs: https://sarcastic-soul.github.io/px4-qnx/ (source `docs/index.html`, codelabs rendered by `codelab/build.sh`)
+  - [Write a QNX 8.0 resource manager and control its priority](https://sarcastic-soul.github.io/px4-qnx/codelab-site/qnx-resmgr-priority/) (no PX4 needed; checked by `codelab/qnx-resmgr-priority/run-demo.sh`)
+  - [Fly PX4 Autopilot on QNX 8.0 in QEMU](https://sarcastic-soul.github.io/px4-qnx/codelab-site/px4-sih-on-qnx/)
 - Upstream: PR draft in [docs/upstream-pr.md](docs/upstream-pr.md). PR URL: _to be added_
 
 ## Known limits

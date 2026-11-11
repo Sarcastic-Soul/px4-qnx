@@ -52,12 +52,12 @@ scripts/fetch-upstream.sh     # -> ../work/PX4-Autopilot, branch qnx-port
 scripts/apply-patches.sh      # git am patches/*.patch
 ```
 
-Expected output ends with the five patch titles, for example:
+Expected output ends with the six patch titles, for example:
 
 ```
 posix: add QNX 8.0 toolchain, platform detection and qnx_sitl board
 ...
-qnx: /dev/px4/state resource manager module
+qnx: review fixes (fixed-priority resmgr channel, per-open snapshot, WQ priority cap, QNX-only resmgr build)
 ```
 
 Create the Python environment PX4 uses for code generation:
@@ -77,8 +77,9 @@ PX4's code generators (uORB messages, parameters, MAVLink) run on the host with 
 scripts/build.sh
 ```
 
-Negative
-: `qnxsdp-env.sh` only works in **bash**. The script runs it in bash for you. It also sets `TMPDIR` to `~/qnx-vm/.tmp`, because `qcc` writes large temp files and some hosts mount `/tmp` with a small quota.
+<aside class="negative">
+<code>qnxsdp-env.sh</code> only works in <strong>bash</strong>. The script runs it in bash for you. It also sets <code>TMPDIR</code> to <code>~/qnx-vm/.tmp</code>, because <code>qcc</code> writes large temp files and some hosts mount <code>/tmp</code> with a small quota.
+</aside>
 
 At the end you should see a QNX binary:
 
@@ -97,8 +98,9 @@ PX4 already has a POSIX layer for Linux and macOS. The port adds a `__PX4_QNX` p
 | Priorities | QNX 8.0 reserves priorities 254 and 255. PX4's maximum is capped at 253 |
 | Threads | QNX threads **inherit** the creator's scheduling by default, so PX4 now sets `PTHREAD_EXPLICIT_SCHED` |
 
-Positive
-: Without the `PTHREAD_EXPLICIT_SCHED` fix, every PX4 work queue silently ran at the same priority (253). Always check with `pidin` after porting a threaded app to QNX.
+<aside class="positive">
+Without the <code>PTHREAD_EXPLICIT_SCHED</code> fix, every PX4 work queue silently ran at the same priority (253). Always check with <code>pidin</code> after porting a threaded app to QNX.
+</aside>
 
 ---
 
@@ -119,8 +121,9 @@ grep procnto ~/qnx-vm-px4/output/build/ifs.build
 # ... procnto-smp-instr -mr -d 0777 -u 0777  -C 10000
 ```
 
-Negative
-: QNX 8.0 is tickless, but normal timers (`nanosleep`, condition-variable timeouts) still round to the tick. With the default 1 kHz tick, PX4's 800 Hz loop runs in 1 ms and 2 ms steps. 10 kHz removes most of that jitter.
+<aside class="negative">
+QNX 8.0 is tickless, but normal timers (<code>nanosleep</code>, condition-variable timeouts) still round to the tick. With the default 1 kHz tick, PX4's 800 Hz loop runs in 1 ms and 2 ms steps. 10 kHz removes most of that jitter.
+</aside>
 
 Boot it headless and copy PX4 in:
 
@@ -261,8 +264,9 @@ iofunc_attr_init(&attr, S_IFCHR | 0444, nullptr, nullptr);
 resmgr_attach(dpp, &rattr, "/dev/px4/state", _FTYPE_ANY, 0, &connect_funcs, &io_funcs, &attr);
 ```
 
-Positive
-: By default, QNX message passing runs the server thread at the **client's** priority, so a real-time reader would lift it. `_NTO_CHF_FIXED_PRIORITY` turns that off: the server stays at 97, below every control loop. Check it with `on -p 200f cat /dev/px4/state` and `pidin -p px4 -F '%h %p' | grep qnx_state`.
+<aside class="positive">
+By default, QNX message passing runs the server thread at the <strong>client's</strong> priority, so a real-time reader would lift it. <code>_NTO_CHF_FIXED_PRIORITY</code> turns that off: the server stays at 97, below every control loop. Check it with <code>on -p 200f cat /dev/px4/state</code> and <code>pidin -p px4 -F '%h %p' | grep qnx_state</code>.
+</aside>
 
 ---
 

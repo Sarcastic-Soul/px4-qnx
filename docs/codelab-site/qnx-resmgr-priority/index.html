@@ -1,0 +1,436 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Write a QNX 8.0 Resource Manager and Control Its Priority</title>
+
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://qnx.github.io/codelabs/js/codelab-elements.css">
+
+  
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+
+     
+    google-codelab #done {
+      display: none !important;
+    }
+  </style>
+
+</head>
+<body>
+
+  <google-codelab-analytics gaid="UA-49880327-14" ga4id=""></google-codelab-analytics>
+
+  <google-codelab codelab-gaid=""
+                  codelab-ga4id=""
+                  id="qnx-resmgr-priority"
+                  title="Write a QNX 8.0 Resource Manager and Control Its Priority"
+                  environment="web"
+                  feedback-link="https://github.com/Sarcastic-Soul/px4-qnx/issues">
+    
+      <google-codelab-step label="Overview" duration="2">
+        <p>On QNX almost everything is a <strong>resource manager</strong>: a normal process that registers a path such as <code>/dev/ser1</code> or <code>/dev/shmem</code> and answers <code>open()</code>, <code>read()</code> and <code>write()</code> as <strong>messages</strong>. A client calls <code>read()</code>, the C library turns it into <code>MsgSend()</code>, and the kernel delivers it to the server&#39;s channel.</p>
+<p>That message has a side effect most tutorials skip: by default the server thread <strong>runs at the client&#39;s priority</strong> while it handles the request. In this codelab you see that happen, then measure two cases where it matters in real systems.</p>
+<h2 is-upgraded>What you&#39;ll do</h2>
+<ul>
+<li>Write <code>/dev/prio</code>, a resource manager that reports the priority it runs at</li>
+<li>Read it at priority 10, 60 and 200 and watch the server follow the client</li>
+<li>Turn inheritance off with <code>_NTO_CHF_FIXED_PRIORITY</code></li>
+<li>Measure a 1 kHz control loop losing <strong>200 ms</strong> to a server with inheritance</li>
+<li>Measure a server without inheritance starving a client for <strong>1.7 s</strong> (priority inversion)</li>
+<li>Pick the right channel flag for your own server</li>
+</ul>
+<h2 is-upgraded>What you&#39;ll need</h2>
+<ul>
+<li>QNX SDP 8.0 with a non-commercial QNX Everywhere license (see the <a href="https://qnx.github.io/codelabs/get-non-commercial-qnx-license/" target="_blank">license codelab</a>)</li>
+<li>A QNX 8.0 target you can ssh into as root. A QEMU VM from <code>mkqnximage</code> works: see <a href="https://qnx.github.io/codelabs/" target="_blank">Get started with QNX in a VM</a> or the <code>scripts/make-vm.sh</code> / <code>scripts/run-vm.sh</code> pair in the <a href="https://github.com/Sarcastic-Soul/px4-qnx" target="_blank">px4-qnx</a> repo</li>
+<li>At least 2 CPUs on the target (the experiments pin work to CPU 0 with <code>on -C 0</code>)</li>
+<li>Basic C</li>
+</ul>
+<p>All source files are in <a href="https://github.com/Sarcastic-Soul/px4-qnx/tree/main/codelab/qnx-resmgr-priority/src" target="_blank"><code>codelab/qnx-resmgr-priority/src</code></a>. <code>run-demo.sh</code> next to them builds everything, runs every step on the target, and fails if QNX does not behave as described here.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="How a resource manager works" duration="3">
+        <pre><code>client process                         server process (/dev/prio)
+--------------                         --------------------------
+fd = open(&#34;/dev/prio&#34;)  -- _IO_CONNECT --&gt;  connect_funcs.open
+read(fd, buf, n)        -- _IO_READ -----&gt;  io_funcs.read
+          ^                                     |
+          +------------ MsgReply ---------------+
+</code></pre>
+<ol type="1">
+<li>The server creates a <strong>channel</strong> and calls <code>resmgr_attach()</code> to register <code>/dev/prio</code> in the path space.</li>
+<li><code>open("/dev/prio")</code> asks the process manager who owns that path, then connects to the server&#39;s channel.</li>
+<li>Every call on the fd is a message. The server&#39;s dispatch loop receives it and calls your handler.</li>
+<li>Your handler fills in the reply and the client&#39;s <code>read()</code> returns.</li>
+</ol>
+<p>The QNX <code>iofunc_*</code> library has default handlers for almost everything (permissions, <code>stat</code>, <code>lseek</code>, <code>close</code>). You only write the parts that make your device different. Here that is two functions:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p>Function</p>
+</td><td colspan="1" rowspan="1"><p>Called when</p>
+</td><td colspan="1" rowspan="1"><p>Our version</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><code>ocb_calloc</code></p>
+</td><td colspan="1" rowspan="1"><p>each <code>open()</code></p>
+</td><td colspan="1" rowspan="1"><p>allocate a per-open block and format one line of text into it</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><code>io_read</code></p>
+</td><td colspan="1" rowspan="1"><p>each <code>read()</code></p>
+</td><td colspan="1" rowspan="1"><p>copy that text to the client</p>
+</td></tr>
+</table>
+<p>The <strong>OCB</strong> (open control block) is per open file descriptor. Keeping the text there means two readers never see each other&#39;s bytes.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Write the server" duration="8">
+        <p>Create <code>prio_dev.c</code>. Start with the OCB. Defining <code>IOFUNC_OCB_T</code> and <code>RESMGR_OCB_T</code> before the QNX headers makes the library&#39;s handler types use your struct:</p>
+<pre><code language="language-c" class="language-c">struct prio_ocb;
+#define IOFUNC_OCB_T struct prio_ocb
+#define RESMGR_OCB_T struct prio_ocb
+
+#include &lt;errno.h&gt;
+#include &lt;pthread.h&gt;
+#include &lt;sched.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;sys/dispatch.h&gt;
+#include &lt;sys/iofunc.h&gt;
+#include &lt;sys/neutrino.h&gt;
+#include &lt;time.h&gt;
+
+struct prio_ocb {
+    iofunc_ocb_t hdr; /* must be first */
+    char text[128];
+    size_t len;
+};
+</code></pre>
+<p>QNX&#39;s <code>struct sched_param</code> has a field POSIX doesn&#39;t: <code>sched_curpriority</code>, the priority the thread is running at <strong>right now</strong>, including any priority it was handed by a client.</p>
+<pre><code language="language-c" class="language-c">static int current_priority(void)
+{
+    struct sched_param param;
+    int policy;
+
+    if (pthread_getschedparam(pthread_self(), &amp;policy, &amp;param) != EOK) {
+        return -1;
+    }
+
+    return param.sched_curpriority;
+}
+</code></pre>
+<p>On each <code>open()</code>, do some optional busy work (we use it later to stand in for a server that computes its answer), then record the priority:</p>
+<pre><code language="language-c" class="language-c">static struct prio_ocb *ocb_calloc(resmgr_context_t *ctp, iofunc_attr_t *attr)
+{
+    (void)attr;
+    struct prio_ocb *ocb = calloc(1, sizeof(*ocb));
+
+    if (ocb != NULL) {
+        g_count++;
+        busy_work(g_work_ms);
+        int n = snprintf(ocb-&gt;text, sizeof(ocb-&gt;text),
+                 &#34;request=%u server_prio=%d client_pid=%d\n&#34;,
+                 g_count, current_priority(), ctp-&gt;info.pid);
+        ocb-&gt;len = (n &gt; 0) ? (size_t)n : 0;
+    }
+
+    return ocb;
+}
+</code></pre>
+<p><code>ctp->info</code> carries details about the sender, such as its process ID, filled in by the kernel.</p>
+<p>The read handler checks access, then returns whatever is left of the text from the current offset. Returning 0 bytes is how the client sees end of file:</p>
+<pre><code language="language-c" class="language-c">static int io_read(resmgr_context_t *ctp, io_read_t *msg, struct prio_ocb *ocb)
+{
+    int status = iofunc_read_verify(ctp, msg, &amp;ocb-&gt;hdr, NULL);
+
+    if (status != EOK) {
+        return status;
+    }
+
+    if ((msg-&gt;i.xtype &amp; _IO_XTYPE_MASK) != _IO_XTYPE_NONE) {
+        return ENOSYS;
+    }
+
+    size_t off = (size_t)ocb-&gt;hdr.offset;
+    size_t nbytes = 0;
+
+    if (off &lt; ocb-&gt;len) {
+        nbytes = ocb-&gt;len - off;
+
+        if (nbytes &gt; msg-&gt;i.nbytes) {
+            nbytes = msg-&gt;i.nbytes;
+        }
+    }
+
+    if (nbytes &gt; 0) {
+        SETIOV(ctp-&gt;iov, ocb-&gt;text + off, nbytes);
+        ocb-&gt;hdr.offset += nbytes;
+    }
+
+    _IO_SET_READ_NBYTES(ctp, nbytes);
+    return _RESMGR_NPARTS(nbytes &gt; 0 ? 1 : 0);
+}
+</code></pre>
+<p><code>SETIOV</code> points the reply at our buffer. The resource manager library sends it with <code>MsgReply</code> after the handler returns, so nothing is copied twice.</p>
+<p>The full file, with <code>busy_work()</code> and the globals, is <a href="https://github.com/Sarcastic-Soul/px4-qnx/blob/main/codelab/qnx-resmgr-priority/src/prio_dev.c" target="_blank"><code>src/prio_dev.c</code></a>.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Attach the path and run the loop" duration="4">
+        <p><code>main()</code> creates the channel itself, so we control its flags. A compile-time switch picks the flag we compare later:</p>
+<pre><code language="language-c" class="language-c">int main(int argc, char **argv)
+{
+    g_work_ms = argc &gt; 1 ? (unsigned)atoi(argv[1]) : 0;
+
+    static resmgr_connect_funcs_t connect_funcs;
+    static resmgr_io_funcs_t io_funcs;
+    static iofunc_funcs_t ocb_funcs = {.nfuncs = _IOFUNC_NFUNCS,
+                       .ocb_calloc = ocb_calloc, .ocb_free = ocb_free};
+    static iofunc_mount_t mount = {.funcs = &amp;ocb_funcs};
+    static iofunc_attr_t attr;
+
+#ifdef FIXED
+    unsigned flags = _NTO_CHF_FIXED_PRIORITY; /* server keeps its own priority */
+#else
+    unsigned flags = 0;                       /* server runs at the client&#39;s priority */
+#endif
+    int chid = ChannelCreate(flags | _NTO_CHF_DISCONNECT | _NTO_CHF_UNBLOCK);
+    dispatch_t *dpp = dispatch_create_channel(chid, DISPATCH_FLAG_NOLOCK);
+
+    iofunc_func_init(_RESMGR_CONNECT_NFUNCS, &amp;connect_funcs, _RESMGR_IO_NFUNCS, &amp;io_funcs);
+    io_funcs.read = io_read;
+    iofunc_attr_init(&amp;attr, S_IFCHR | 0444, NULL, NULL);
+    attr.mount = &amp;mount;
+
+    resmgr_attach(dpp, NULL, &#34;/dev/prio&#34;, _FTYPE_ANY, 0, &amp;connect_funcs, &amp;io_funcs, &amp;attr);
+
+    dispatch_context_t *ctp = dispatch_context_alloc(dpp);
+
+    for (;;) {
+        ctp = dispatch_block(ctp);   /* MsgReceive */
+        dispatch_handler(ctp);       /* calls our handlers, then MsgReply */
+    }
+}
+</code></pre>
+<p>(Error checks are left out above to keep it short. The source file has them.)</p>
+<p>Notes:</p>
+<ul>
+<li>When you create the channel yourself for a resource manager, the <code>dispatch_create_channel()</code> docs say to set at least <code>_NTO_CHF_UNBLOCK</code> and <code>_NTO_CHF_DISCONNECT</code>.</li>
+<li><code>mount.funcs</code> is how the library finds your <code>ocb_calloc</code>/<code>ocb_free</code>.</li>
+<li><code>0444</code> sets the mode <code>ls -l</code> shows. Root still passes the permission check, so if writes must fail for everyone, return <code>EROFS</code> from your own <code>open</code> handler when <code>msg->connect.ioflag & _IO_FLAG_WR</code> is set (the PX4 module does this).</li>
+<li><code>resmgr_attach</code> needs the <code>PATHSPACE</code> ability. Root has it.</li>
+</ul>
+<aside class="warning"><p> Most examples call <code>dispatch_create()</code>, which creates the channel for you with <strong>no </strong><code>_NTO_CHF_FIXED_PRIORITY</code>. If you want a fixed-priority server, create the channel yourself and pass it to <code>dispatch_create_channel()</code>. </p>
+</aside>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Build and copy" duration="4">
+        <p>You also need two small clients from the repo:</p>
+<ul>
+<li><a href="https://github.com/Sarcastic-Soul/px4-qnx/blob/main/codelab/qnx-resmgr-priority/src/prio_read.c" target="_blank"><code>src/prio_read.c</code></a>: opens a path once, prints its own priority, how long the call took, and what it read.</li>
+<li><a href="https://github.com/Sarcastic-Soul/px4-qnx/blob/main/codelab/qnx-resmgr-priority/src/prio_tick.c" target="_blank"><code>src/prio_tick.c</code></a>: a stand-in control loop. Wakes every 1 ms and prints the worst gap between wakeups.</li>
+</ul>
+<p>And a CPU hog, <a href="https://github.com/Sarcastic-Soul/px4-qnx/blob/main/bench/hog.c" target="_blank"><code>bench/hog.c</code></a>, for the last experiment.</p>
+<p>On the host, in <strong>bash</strong>:</p>
+<pre><code language="language-bash" class="language-bash">source ~/qnx800/qnxsdp-env.sh
+qcc -Vgcc_ntox86_64 -Wall -O2 -o prio_dev        prio_dev.c
+qcc -Vgcc_ntox86_64 -Wall -O2 -o prio_dev_fixed  prio_dev.c -DFIXED
+qcc -Vgcc_ntox86_64 -Wall -O2 -o prio_read       prio_read.c
+qcc -Vgcc_ntox86_64 -Wall -O2 -o prio_tick       prio_tick.c
+qcc -Vgcc_ntox86_64 -Wall -O2 -o hog             hog.c
+</code></pre>
+<p>Use <code>-Vgcc_ntoaarch64le</code> instead for a Raspberry Pi or other ARM target.</p>
+<p>Copy them to a writable directory on the target (QEMU VMs from <code>mkqnximage</code> have <code>/data</code>):</p>
+<pre><code language="language-bash" class="language-bash">ssh root@&lt;target&gt; mkdir -p /data/codelab
+scp -O prio_dev prio_dev_fixed prio_read prio_tick hog root@&lt;target&gt;:/data/codelab/
+</code></pre>
+<aside class="special"><p><code>scp -O</code> uses the legacy SCP protocol. The QNX image&#39;s <code>sshd</code> has no SFTP server by default, so plain <code>scp</code> fails without it. </p>
+</aside>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Who runs the server?" duration="4">
+        <p>ssh into the target, then start the server in the background. It starts at the shell&#39;s priority, 10:</p>
+<pre><code language="language-bash" class="language-bash">cd /data/codelab
+./prio_dev &amp;
+</code></pre>
+<pre><code>/dev/prio ready, server priority 10, channel default (inherits), work 0 ms
+</code></pre>
+<p>It&#39;s a normal file now. <code>ls -l /dev/prio</code> and <code>cat /dev/prio</code> both work. Read it from clients at three priorities. <code>on -p 60f</code> runs a command at priority 60 with <code>SCHED_FIFO</code>:</p>
+<pre><code language="language-bash" class="language-bash">./prio_read
+on -p 60f ./prio_read
+on -p 200f ./prio_read
+</code></pre>
+<pre><code>client_prio=10 took_ms=0.1 request=1 server_prio=10 client_pid=1753110
+client_prio=60 took_ms=0.1 request=2 server_prio=60 client_pid=1761302
+client_prio=200 took_ms=0.1 request=3 server_prio=200 client_pid=1773590
+</code></pre>
+<p>The server&#39;s own priority is 10, but it handled each request at the <strong>client&#39;s</strong> priority. Look at the thread while it waits:</p>
+<pre><code language="language-bash" class="language-bash">pidin -p prio_dev -F &#34;%N %h %p %J&#34;
+</code></pre>
+<pre><code>name               thread name          prio STATE
+prio_dev           1                    200r RECEIVE
+</code></pre>
+<p>It stays at the last priority it was given until the next message arrives.</p>
+<p>Now the fixed-priority build:</p>
+<pre><code language="language-bash" class="language-bash">slay prio_dev
+./prio_dev_fixed &amp;
+./prio_read
+on -p 60f ./prio_read
+on -p 200f ./prio_read
+slay prio_dev_fixed
+</code></pre>
+<pre><code>client_prio=10 took_ms=0.2 request=1 server_prio=10 client_pid=1818646
+client_prio=60 took_ms=0.1 request=2 server_prio=10 client_pid=1826838
+client_prio=200 took_ms=0.1 request=3 server_prio=10 client_pid=1839126
+</code></pre>
+<p>The server stays at 10 for every client.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Experiment 1: a client runs server work above your control loop" duration="5">
+        <p>Inheritance means a high-priority client can make a server do <strong>its work at high priority</strong>, even if that work has nothing to do with real time. Here:</p>
+<ul>
+<li><code>prio_tick</code> is a 1 kHz control loop at FIFO <strong>100</strong>.</li>
+<li><code>prio_dev 200</code> spends <strong>200 ms</strong> of CPU on each request. Think of a logger formatting a big status dump.</li>
+<li>A client at FIFO <strong>200</strong> reads it once.</li>
+<li>Everything runs on CPU 0 (<code>on -C 0</code>) so they really compete.</li>
+</ul>
+<pre><code language="language-bash" class="language-bash">on -C 0 ./prio_dev 200 &amp;
+sleep 1
+on -C 0 -p 100f ./prio_tick 2 &amp;
+sleep 0.5
+on -C 0 -p 200f ./prio_read
+wait $!
+slay prio_dev
+</code></pre>
+<pre><code>client_prio=200 took_ms=200.1 request=1 server_prio=200 client_pid=1921047
+tick: 1521 cycles in 2 s, worst gap 201.7 ms
+</code></pre>
+<p>The control loop missed <strong>200 cycles in a row</strong>. The server&#39;s code ran at 200, above the loop at 100, because the client asked for it. Same test with <code>prio_dev_fixed 200</code>:</p>
+<pre><code>client_prio=200 took_ms=200.1 request=1 server_prio=10 client_pid=1990679
+tick: 1691 cycles in 2 s, worst gap 1.4 ms
+</code></pre>
+<p>The loop is untouched. The 200 ms of work now runs at 10, below the loop, and the client still gets its answer in the same time, because the loop sleeps between ticks and leaves CPU time free.</p>
+<aside class="warning"><p> This is what a fixed-priority channel is for: a server that does <strong>non-critical work</strong> for <strong>critical clients</strong>. The <a href="https://github.com/Sarcastic-Soul/px4-qnx" target="_blank">PX4 on QNX port</a> uses it for <code>/dev/px4/state</code>, so a real-time reader can&#39;t run the state server above the flight controller. </p>
+</aside>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Experiment 2: priority inversion" duration="5">
+        <p>Fixed priority has a cost. If the server&#39;s own priority is low, <strong>anything</strong> between it and the client can delay the client. That is priority inversion, and inheritance exists to prevent it.</p>
+<ul>
+<li><code>prio_dev 5</code>: 5 ms of work per request, own priority 10</li>
+<li><code>hog 1 2</code>: one busy thread at round-robin priority <strong>30</strong> for 2 s</li>
+<li>A client at FIFO <strong>60</strong> reads once</li>
+</ul>
+<p>All on CPU 0:</p>
+<pre><code language="language-bash" class="language-bash">on -C 0 ./prio_dev 5 &amp;
+sleep 1
+on -C 0 -p 30r ./hog 1 2 &gt; /dev/null &amp;
+sleep 0.3
+on -C 0 -p 60f ./prio_read
+sleep 2; slay prio_dev
+</code></pre>
+<pre><code>client_prio=60 took_ms=5.0 request=1 server_prio=60 client_pid=2084887
+</code></pre>
+<p>With inheritance the server ran at 60, above the hog, and replied in 5 ms. With <code>prio_dev_fixed 5</code>:</p>
+<pre><code>client_prio=60 took_ms=1701.7 request=1 server_prio=10 client_pid=2162711
+</code></pre>
+<p><strong>1.7 seconds</strong> for a 5 ms request. The client at 60 was blocked on a server at 10, and the hog at 30 sat in between until it finished.</p>
+<h2 is-upgraded>Run all of it in one go</h2>
+<p>From the repo root on the host, with the VM running:</p>
+<pre><code language="language-bash" class="language-bash">codelab/qnx-resmgr-priority/run-demo.sh
+</code></pre>
+<pre><code>PASS: inheritance gap 201.7 ms vs fixed 1.4 ms; inversion: inherit 5.0 ms vs fixed 1701.7 ms
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Choosing the flag" duration="2">
+        <table>
+<tr><td colspan="1" rowspan="1"><p>Server does</p>
+</td><td colspan="1" rowspan="1"><p>Clients are</p>
+</td><td colspan="1" rowspan="1"><p>Use</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p>Real-time work for real-time clients (a driver, a sensor server)</p>
+</td><td colspan="1" rowspan="1"><p>any</p>
+</td><td colspan="1" rowspan="1"><p>default channel: inheritance prevents inversion</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p>Non-critical work, may be slow (logging, status, diagnostics)</p>
+</td><td colspan="1" rowspan="1"><p>may be real-time</p>
+</td><td colspan="1" rowspan="1"><p><code>_NTO_CHF_FIXED_PRIORITY</code>, and set the server&#39;s own priority on purpose</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p>Mixed</p>
+</td><td colspan="1" rowspan="1"><p>mixed</p>
+</td><td colspan="1" rowspan="1"><p>split it: one fixed-priority channel for slow requests, a normal one for fast ones</p>
+</td></tr>
+</table>
+<p>With a fixed-priority server, its own priority is now <strong>your</strong> design decision. Pick it above anything that could block its clients for too long, and below anything it must never delay.</p>
+<p>Also worth knowing:</p>
+<ul>
+<li>Pulses (<code>MsgSendPulse</code>) carry a priority too, and a server thread receiving one also switches to it.</li>
+<li><code>pidin</code> with <code>%p</code> shows a thread&#39;s current priority with its policy letter (<code>f</code> FIFO, <code>r</code> round robin, <code>o</code> other).</li>
+<li>Priorities 254 and 255 are reserved for the kernel in QNX 8.0. Applications use 1..253.</li>
+</ul>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Clean up and next steps" duration="1">
+        <pre><code language="language-bash" class="language-bash">slay -f prio_dev; slay -f prio_dev_fixed
+rm -r /data/codelab
+</code></pre>
+<p>You wrote a QNX resource manager, saw Neutrino message passing hand the client&#39;s priority to the server, and measured both sides of that design: a 200 ms control-loop stall when a fixed-priority server would have been right, and a 1.7 s inversion when inheritance would have been right.</p>
+<h2 is-upgraded>Learn more</h2>
+<ul>
+<li><a href="https://www.qnx.com/developers/docs/8.0/com.qnx.doc.neutrino.resmgr/topic/about.html" target="_blank">Writing a Resource Manager</a></li>
+<li><a href="https://www.qnx.com/developers/docs/8.0/com.qnx.doc.neutrino.lib_ref/topic/c/channelcreate.html" target="_blank"><code>ChannelCreate()</code></a>: all channel flags</li>
+<li><a href="https://www.qnx.com/developers/docs/8.0/com.qnx.doc.neutrino.getting_started/topic/about.html" target="_blank">Getting Started with QNX: message passing and priority inheritance</a></li>
+<li><a href="https://sarcastic-soul.github.io/px4-qnx/" target="_blank">PX4 on QNX 8.0</a>: a real fixed-priority resource manager inside a flight controller</li>
+</ul>
+
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://qnx.github.io/codelabs/js/native-shim.js"></script>
+  <script src="https://qnx.github.io/codelabs/js/custom-elements.min.js"></script>
+  <script src="https://qnx.github.io/codelabs/js/prettify.js"></script>
+  <script src="https://qnx.github.io/codelabs/js/codelab-elements.js"></script>
+  <script src="//support.google.com/inapp/api.js"></script>
+
+  <script>
+    
+    navigation.addEventListener("navigate", (event) => {
+    const url = new URL(event.destination.url);
+
+    if (url.pathname == "/") {
+      window.location.href = "https://qnx.github.io/codelabs/";
+    }
+  });
+  </script>
+
+</body>
+</html>

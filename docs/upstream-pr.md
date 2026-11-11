@@ -4,7 +4,7 @@ Status: draft, not opened. Opening it needs a GitHub fork of PX4 and the user's 
 
 ## Scope
 
-Send patches 0001–0003 and 0005 as one draft PR: "posix: add QNX 8.0 support". Leave 0004 (rate-control interval perf counter) out, or send it on its own. It is a measurement aid, not part of QNX support.
+Send patches 0001–0003, 0005 and 0006 as one draft PR: "posix: add QNX 8.0 support". Leave 0004 (rate-control interval perf counter) out, or send it on its own. It is a measurement aid, not part of QNX support.
 
 Also before opening: replace the `-Wshadow` pragma in `statfs.h` with a `px4_statfs()` / `struct px4_statfs` name to avoid review friction.
 

@@ -1,0 +1,27 @@
+{
+  "environment": "web",
+  "format": "html",
+  "prefix": "https://storage.googleapis.com",
+  "mainga": "UA-49880327-14",
+  "updated": "2026-11-11T16:56:48+05:30",
+  "id": "qnx-resmgr-priority",
+  "duration": 38,
+  "title": "Write a QNX 8.0 Resource Manager and Control Its Priority",
+  "authors": "Anish Kumar",
+  "summary": "Build a /dev resource manager in 150 lines of C, then measure how QNX message passing hands priority from client to server, when that helps, and when it breaks a real-time loop.",
+  "source": "/home/anish-kumar/Code/Hackathons/Devpost/qnx-global-hackathon/px4-qnx/codelab/qnx-resmgr-priority/qnx-resmgr-priority.md",
+  "theme": "",
+  "status": [
+    "published"
+  ],
+  "category": [
+    "real-time",
+    "messagepassing",
+    "resourcemanagers"
+  ],
+  "tags": [
+    "beginner"
+  ],
+  "feedback": "https://github.com/Sarcastic-Soul/px4-qnx/issues",
+  "url": "qnx-resmgr-priority"
+}
