@@ -4,7 +4,7 @@ Opened as a draft: https://github.com/PX4/PX4-Autopilot/pull/29765
 
 - Title: `feat(platforms/posix): add QNX 8.0 support with qnx_sitl board`
 - Head: `Sarcastic-Soul/PX4-Autopilot` branch `sarcastic-soul/qnx-support`, base `main` (rebased onto `main` at `3695a9e9`, 2026-11-11).
-- 7 conventional commits, each with the `Assisted-by:` trailer PX4's [AI policy](https://github.com/PX4/PX4-Autopilot/blob/main/CONTRIBUTING.md#ai-assisted-contributions) asks for.
+- 8 conventional commits (7 for QNX support, 1 to keep QNX out of the default CI, which has no QNX SDP), each with the `Assisted-by:` trailer PX4's [AI policy](https://github.com/PX4/PX4-Autopilot/blob/main/CONTRIBUTING.md#ai-assisted-contributions) asks for.
 
 ## How the PR differs from `patches/` (v1.17.0)
 
@@ -16,6 +16,7 @@ Opened as a draft: https://github.com/PX4/PX4-Autopilot/pull/29765
 - The board follows `main`'s SITL layout (`CONFIG_BOARD_ROOT_PATH="./fs"`) and enables `failure_injection_manager`, which `main`'s rcS starts by default.
 - Logger old-log cleanup checks that the joined path fits (newer GCC `-Wformat-truncation`).
 - Patch 0004 (rate-controller interval perf counter) is left out: it is a benchmark aid, not QNX support.
+- PX4 CI has no QNX SDP: `qnx_sitl` is excluded from the build-all matrix (as PX4 already does for `aifoundry_erbium`) and `qnx_state_resmgr` from `px4_sitl_allyes`. The first CI run failed on both.
 
 ## What was run on the PR branch
 
