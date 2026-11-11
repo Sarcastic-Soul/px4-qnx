@@ -19,7 +19,8 @@ cp -a "$BUILD_DIR/etc" "$stage/etc"
 # The 30 MB debug binary stays on the host for gdb; ship a stripped copy.
 "$QNX_SDP/host/linux/x86_64/usr/bin/ntox86_64-strip" -o "$stage/bin/px4" "$BUILD_DIR/bin/px4"
 
-"$SSH" "mkdir -p $PX4_ROOT/rootfs && rm -rf $PX4_ROOT/bin $PX4_ROOT/etc"
+# stop a running PX4 first: its binary is busy and cannot be replaced
+"$SSH" "slay -f -Q px4 2>/dev/null; sleep 1; mkdir -p $PX4_ROOT/rootfs && rm -rf $PX4_ROOT/bin $PX4_ROOT/etc"
 tar -C "$stage" -cf - bin etc | "$SSH" "tar -C $PX4_ROOT -xf -"
 "$SSH" "ls -l $PX4_ROOT/bin/px4"
 echo "deployed to $PX4_ROOT"

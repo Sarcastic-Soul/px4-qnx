@@ -33,9 +33,9 @@ PX4 has three platform layers: NuttX (flight controllers), POSIX (Linux, macOS, 
 
 PX4 runs everything as threads in one process. Work queues (`wq:*`) run many small modules each. The rate controller, mixer and actuator output share `wq:rate_ctrl`.
 
-PX4 sets priorities as offsets below `sched_get_priority_max(SCHED_FIFO)`. On QNX 8.0 that is 253, because 254 is the clock interrupt thread and 255 is for IPIs. The port also caps `SCHED_PRIORITY_MAX` at 253 for safety.
+PX4 sets priorities as offsets below `sched_get_priority_max(SCHED_FIFO)`. On QNX 8.0 that is 253, because 254 is the clock interrupt thread and 255 is for IPIs. On QNX the port caps both `SCHED_PRIORITY_MAX` (tasks) and the work-queue base at 253, so this holds even if `sched_get_priority_max()` returned more.
 
-QNX threads inherit their creator's scheduling unless `PTHREAD_EXPLICIT_SCHED` is set. Linux PX4 code didn't need it, because there `pthread_attr_setschedparam` takes effect on its own. Without the fix, every work queue ran at 253. The fix is in the four places PX4 creates threads with explicit priorities.
+Threads inherit their creator's scheduling unless `PTHREAD_EXPLICIT_SCHED` is set. That is POSIX, and glibc does the same. Upstream PX4 never noticed because Linux SITL usually runs unprivileged, where the requested priorities fail anyway. On QNX (running as root) the effect was visible: every work queue ran at 253. The fix sets `PTHREAD_EXPLICIT_SCHED` in the four places PX4 creates threads with explicit priorities (QNX-only in this port; worth making unconditional upstream).
 
 `tests/test_priorities.sh` checks the result: every thread in 1..253, work queues `SCHED_FIFO` and ordered rate_ctrl > INS0 > hp_default > lp_default.
 
@@ -53,4 +53,4 @@ QEMU user-mode NAT: the guest sees the host at `10.0.2.2`, and the host reaches 
 
 ## QNX-native interface
 
-`qnx_state_resmgr` registers `/dev/px4/state` with `resmgr_attach()`. Each `open()` takes a fresh snapshot of `vehicle_status`, `vehicle_local_position` and `battery_status`. `read()` returns it as one text line. The handler thread runs at the reading client's priority (QNX priority inheritance through message passing), so readers can't disturb the control loops.
+`qnx_state_resmgr` registers `/dev/px4/state` with `resmgr_attach()`. Each `open()` gets its own OCB holding a fresh snapshot of `vehicle_status`, `vehicle_local_position` and `battery_status`. `read()` returns it as one text line. The channel uses `_NTO_CHF_FIXED_PRIORITY`, so the handler thread stays at its own low priority whatever the reader's priority is.

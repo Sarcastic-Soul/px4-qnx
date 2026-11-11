@@ -1,7 +1,7 @@
 From 40b64f311bc680cb6a2099766b255f68db7b907a Mon Sep 17 00:00:00 2001
 From: Sarcastic-Soul <anishisbusy@gmail.com>
 Date: Wed, 11 Nov 2026 02:10:53 +0530
-Subject: [PATCH 1/5] posix: add QNX 8.0 toolchain, platform detection and
+Subject: [PATCH 1/6] posix: add QNX 8.0 toolchain, platform detection and
  qnx_sitl board
 
 ---

@@ -42,7 +42,7 @@ Compiler (`-Werror`, gcc 12 in qcc):
 Scheduling (runtime, found in Stage 4):
 
 - QNX 8.0 reserves priority 255 (IPIs) and 254 (clock IST). `sched_get_priority_max(SCHED_FIFO)` returns 253 on our image, and PX4 priorities are offsets below it. `tasks.h` caps `SCHED_PRIORITY_MAX` at 253 for `__PX4_QNX` anyway. Verified: a thread at 254 fails `pthread_create` with `EINVAL`.
-- QNX threads inherit the creator's scheduling by default, so `pthread_attr_setschedparam()` alone is ignored. Before the fix every work queue ran at 253 (inherited from `wq:manager`), log writer at 228, etc. Added `PTHREAD_EXPLICIT_SCHED` + `SCHED_FIFO` on QNX in `WorkQueueManager.cpp`, `log_writer_file.cpp`, `mavlink_receiver.cpp`, `commander/worker_thread.cpp`. Result (`tests/test_priorities.sh`): rate_ctrl 253 > INS0 239 > hp_default 235 > lp_default 203, log_writer_file 87.
+- Threads inherit the creator's scheduling by default (POSIX, glibc too), so `pthread_attr_setschedparam()` alone is ignored. Linux SITL hides this because it runs unprivileged. Before the fix every work queue ran at 253 (inherited from `wq:manager`), log writer at 228, etc. Added `PTHREAD_EXPLICIT_SCHED` + `SCHED_FIFO` on QNX in `WorkQueueManager.cpp`, `log_writer_file.cpp`, `mavlink_receiver.cpp`, `commander/worker_thread.cpp`. Result (`tests/test_priorities.sh`): rate_ctrl 253 > INS0 239 > hp_default 235 > lp_default 203, log_writer_file 87.
 
 Networking:
 

@@ -44,6 +44,10 @@ log "hog: $HOG_THREADS busy threads, default scheduling, for ${PHASE_S} s"
 "$WORK_DIR/hog-linux" "$HOG_THREADS" $((PHASE_S + 20)) &
 sleep 3
 measure "$LABEL hog ${HOG_THREADS}x" | tee -a "$out"
-pid="$(pgrep -f "$BUILD/bin/px4 -d" | head -1)"
-log "PX4 policy: $(chrt -p "$pid" 2>&1 | head -1)"
+pid="$(pgrep -f 'bin/px4 -d' | head -1 || true)"
+if [ -n "$pid" ]; then
+    # per-thread scheduling class and RT priority, as evidence for the writeup
+    ps -L -o tid,cls,rtprio,comm -p "$pid" > "$RESULTS/$LABEL-sched.txt"
+    log "PX4 thread scheduling classes: $(awk 'NR>1 {print $2}' "$RESULTS/$LABEL-sched.txt" | sort | uniq -c | tr '\n' ' ') (saved $RESULTS/$LABEL-sched.txt)"
+fi
 log "results in $out"

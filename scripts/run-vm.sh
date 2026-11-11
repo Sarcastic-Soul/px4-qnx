@@ -8,6 +8,7 @@
 # Stop:  kill "$(cat "$VM_DIR/output/qemu.pid")"
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VM_DIR="${VM_DIR:-$HOME/qnx-vm-px4}"
 SSH_PORT="${SSH_PORT:-2222}"
 cd "$VM_DIR"
@@ -31,13 +32,13 @@ qemu-system-x86_64 \
 
 if [ "${1:-}" != "-f" ]; then
     # wait for sshd
-    for _ in $(seq 1 300); do
-        if "$(dirname "$0")/vm-ssh.sh" true 2>/dev/null; then
+    for _ in $(seq 1 "${BOOT_WAIT_S:-600}"); do
+        if "$SCRIPT_DIR/vm-ssh.sh" true 2>/dev/null; then
             echo "VM up (ssh port $SSH_PORT)"
             exit 0
         fi
         sleep 1
     done
-    echo "VM did not answer on ssh within 300 s; see $VM_DIR/output/qemu.out" >&2
+    echo "VM did not answer on ssh within ${BOOT_WAIT_S:-600} s (first boot of a new image expands the filesystem and is slow); see $VM_DIR/output/qemu.out" >&2
     exit 1
 fi

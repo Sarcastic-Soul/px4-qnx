@@ -3,7 +3,7 @@
   "format": "html",
   "prefix": "https://storage.googleapis.com",
   "mainga": "UA-49880327-14",
-  "updated": "2026-11-11T05:29:40+05:30",
+  "updated": "2026-11-11T09:05:20+05:30",
   "id": "px4-sih-on-qnx",
   "duration": 54,
   "title": "Fly PX4 Autopilot on QNX 8.0 in QEMU",

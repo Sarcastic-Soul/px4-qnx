@@ -59,11 +59,11 @@ PX4 is built with the QNX SDP 8.0.5 toolchain (qcc/q++, platforms/posix/cmake/To
 
 QNX real-time scheduling: every PX4 thread runs SCHED_FIFO at 1..253 (254/255 are reserved in 8.0). PTHREAD_EXPLICIT_SCHED was added because QNX threads inherit scheduling by default (WorkQueueManager.cpp and three others). tests/test_priorities.sh checks this.
 
-QNX resource manager: the PX4 module qnx_state_resmgr (dispatch_create_channel, resmgr_attach, iofunc_*) serves live vehicle state at /dev/px4/state, and QNX message passing runs it at the reader's priority (tests/test_resmgr.sh).
+QNX resource manager: the PX4 module qnx_state_resmgr (ChannelCreate with _NTO_CHF_FIXED_PRIORITY, dispatch_create_channel, resmgr_attach, iofunc_* with a per-open OCB) serves live vehicle state at /dev/px4/state. The server stays at a fixed low priority even for real-time readers (tests/test_resmgr.sh).
 
 System analysis: tracelogger/traceprinter capture of the rate-controller thread (bench/trace_ratectrl.sh). Process isolation plus dumper core files during a mission (tests/test_fault_isolation.sh). pidin, on -p, slog2info and ntox86_64-gdb were used throughout.
 
-Result: under 2x CPU overload, Linux SITL lost 23% of rate-controller updates, while the QNX build kept 800 Hz even with the load at FIFO priority 200 (docs/results.md, bench/). Full map of files and demo timestamps: docs/qnx-evidence.md.
+Result: under 2x CPU overload, stock Linux SITL (unprivileged, no real-time priorities) lost 23% of rate-controller updates. On QNX the 800 Hz rate loop was unchanged, including with the load at FIFO priority 200, where only lower-priority PX4 tasks were starved, as designed (docs/results.md, bench/). Full map of files and demo timestamps: docs/qnx-evidence.md.
 
 Pull request URL:
 

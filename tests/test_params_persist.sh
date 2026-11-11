@@ -9,6 +9,8 @@ VALUE="${VALUE:-7.25}"
 
 ensure_px4
 orig="$(px4cmd param show -q "$PARAM" | tr -d '\r')"
+awk -v a="$orig" -v b="$VALUE" 'BEGIN{d=a-b; if (d<0) d=-d; exit (d < 1e-4)}' ||
+    fail "$PARAM is already $VALUE; pick another VALUE"
 info "$PARAM was $orig, setting $VALUE"
 px4cmd param set "$PARAM" "$VALUE" >/dev/null
 # PX4 auto-saves params with a short delay; force the write before stopping.

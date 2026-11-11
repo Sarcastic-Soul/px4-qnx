@@ -1,7 +1,7 @@
 From 4e4830fed01093e35be4be8293dec64c4023b89e Mon Sep 17 00:00:00 2001
 From: Sarcastic-Soul <anishisbusy@gmail.com>
 Date: Wed, 11 Nov 2026 03:49:21 +0530
-Subject: [PATCH 3/5] qnx: explicit thread scheduling, SIH board config,
+Subject: [PATCH 3/6] qnx: explicit thread scheduling, SIH board config,
  MAVLink partner IP
 
 ---

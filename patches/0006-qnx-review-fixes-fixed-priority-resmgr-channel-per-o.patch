@@ -1,0 +1,255 @@
+From 42eac13f3c9608bb5f00f2c7281820eea0402775 Mon Sep 17 00:00:00 2001
+From: Sarcastic-Soul <anishisbusy@gmail.com>
+Date: Wed, 11 Nov 2026 09:12:21 +0530
+Subject: [PATCH 6/6] qnx: review fixes (fixed-priority resmgr channel,
+ per-open snapshot, WQ priority cap, QNX-only resmgr build)
+
+---
+ .../px4_work_queue/WorkQueueManager.cpp       |  5 ++
+ src/modules/mavlink/mavlink_main.cpp          |  1 -
+ src/modules/qnx_state_resmgr/CMakeLists.txt   |  4 +
+ .../qnx_state_resmgr/qnx_state_resmgr.cpp     | 86 ++++++++++++++-----
+ 4 files changed, 73 insertions(+), 23 deletions(-)
+
+diff --git a/platforms/common/px4_work_queue/WorkQueueManager.cpp b/platforms/common/px4_work_queue/WorkQueueManager.cpp
+index 4315bfd..15ff121 100644
+--- a/platforms/common/px4_work_queue/WorkQueueManager.cpp
++++ b/platforms/common/px4_work_queue/WorkQueueManager.cpp
+@@ -280,7 +280,12 @@ WorkQueueManagerRun(int, char **)
+ #endif
+ 
+ 			// priority
++#if defined(__PX4_QNX)
++			// capped at 253: QNX 8.0 reserves 254 (clock IST) and 255 (IPIs)
++			int sched_priority = SCHED_PRIORITY_MAX + wq->relative_priority;
++#else
+ 			int sched_priority = sched_get_priority_max(SCHED_FIFO) + wq->relative_priority;
++#endif
+ 
+ 			// use pthreads for NuttX flat and posix builds. For NuttX protected build, use tasks or kernel threads
+ #if !defined(__PX4_NUTTX) || defined(CONFIG_BUILD_FLAT)
+diff --git a/src/modules/mavlink/mavlink_main.cpp b/src/modules/mavlink/mavlink_main.cpp
+index 972247c..857e540 100644
+--- a/src/modules/mavlink/mavlink_main.cpp
++++ b/src/modules/mavlink/mavlink_main.cpp
+@@ -42,7 +42,6 @@
+ 
+ #include <termios.h>
+ 
+-
+ #ifdef CONFIG_NET
+ #include <arpa/inet.h>
+ #include <netinet/in.h>
+diff --git a/src/modules/qnx_state_resmgr/CMakeLists.txt b/src/modules/qnx_state_resmgr/CMakeLists.txt
+index 46c2ccc..cc70517 100644
+--- a/src/modules/qnx_state_resmgr/CMakeLists.txt
++++ b/src/modules/qnx_state_resmgr/CMakeLists.txt
+@@ -31,6 +31,10 @@
+ #
+ ############################################################################
+ 
++if(NOT CMAKE_SYSTEM_NAME STREQUAL "QNX")
++	message(FATAL_ERROR "qnx_state_resmgr needs a QNX target (QNX resource manager API)")
++endif()
++
+ px4_add_module(
+ 	MODULE modules__qnx_state_resmgr
+ 	MAIN qnx_state_resmgr
+diff --git a/src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp b/src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp
+index 3ef2f58..288fbd2 100644
+--- a/src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp
++++ b/src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp
+@@ -39,8 +39,9 @@
+  * without linking PX4, uORB or MAVLink. Each open() gets a fresh snapshot
+  * as one line of key=value text.
+  *
+- * The resource manager thread runs at a low priority so readers cannot
+- * disturb the control loops.
++ * The channel is created with _NTO_CHF_FIXED_PRIORITY, so the server thread
++ * keeps its own low priority instead of inheriting a reader's: even a reader
++ * at a real-time priority cannot run this code above the control loops.
+  */
+ 
+ #include <px4_platform_common/px4_config.h>
+@@ -59,8 +60,19 @@
+ #include <stdio.h>
+ #include <string.h>
+ 
++// Each open() gets its own OCB with its own snapshot, so concurrent readers
++// never see each other's bytes.
++struct state_ocb_t;
++#define IOFUNC_OCB_T struct state_ocb_t
+ #include <sys/dispatch.h>
+ #include <sys/iofunc.h>
++#include <sys/neutrino.h>
++
++struct state_ocb_t {
++	iofunc_ocb_t hdr; // must be first
++	char text[256];
++	size_t len;
++};
+ 
+ static constexpr const char *kPath = "/dev/px4/state";
+ 
+@@ -78,26 +90,28 @@ public:
+ private:
+ 	static int io_open(resmgr_context_t *ctp, io_open_t *msg, RESMGR_HANDLE_T *handle, void *extra);
+ 	static int io_read(resmgr_context_t *ctp, io_read_t *msg, RESMGR_OCB_T *ocb);
++	static state_ocb_t *ocb_calloc(resmgr_context_t *ctp, iofunc_attr_t *attr);
++	static void ocb_free(state_ocb_t *ocb);
+ 
+-	// Format the current state into _snapshot. Called from the resmgr thread only.
+-	void update_snapshot();
++	// Format the current state into buf. Called from the resmgr thread only.
++	size_t format_state(char *buf, size_t size);
+ 
+ 	uORB::Subscription _status_sub{ORB_ID(vehicle_status)};
+ 	uORB::Subscription _lpos_sub{ORB_ID(vehicle_local_position)};
+ 	uORB::Subscription _battery_sub{ORB_ID(battery_status)};
+ 
+-	char _snapshot[256] {};
+-	size_t _snapshot_len{0};
+ 	unsigned _reads{0};
+ 
+ 	resmgr_connect_funcs_t _connect_funcs{};
+ 	resmgr_io_funcs_t _io_funcs{};
++	iofunc_funcs_t _ocb_funcs{};
++	iofunc_mount_t _mount{};
+ 	iofunc_attr_t _attr{};
+ };
+ 
+ static QnxStateResmgr *g_self = nullptr;
+ 
+-void QnxStateResmgr::update_snapshot()
++size_t QnxStateResmgr::format_state(char *buf, size_t size)
+ {
+ 	vehicle_status_s status{};
+ 	vehicle_local_position_s lpos{};
+@@ -106,7 +120,7 @@ void QnxStateResmgr::update_snapshot()
+ 	const bool have_lpos = _lpos_sub.copy(&lpos);
+ 	const bool have_battery = _battery_sub.copy(&battery);
+ 
+-	const int n = snprintf(_snapshot, sizeof(_snapshot),
++	const int n = snprintf(buf, size,
+ 			       "t_us=%llu armed=%d nav_state=%d "
+ 			       "x=%.2f y=%.2f alt=%.2f vx=%.2f vy=%.2f vz=%.2f heading_deg=%.1f "
+ 			       "pos_valid=%d battery=%.2f\n",
+@@ -123,24 +137,39 @@ void QnxStateResmgr::update_snapshot()
+ 			       have_lpos ? (lpos.xy_valid && lpos.z_valid) : 0,
+ 			       have_battery ? (double)battery.remaining : -1.0);
+ 
+-	_snapshot_len = (n > 0) ? math::min((size_t)n, sizeof(_snapshot) - 1) : 0;
++	return (n > 0) ? math::min((size_t)n, size - 1) : 0;
+ }
+ 
+ int QnxStateResmgr::io_open(resmgr_context_t *ctp, io_open_t *msg, RESMGR_HANDLE_T *handle, void *extra)
+ {
+-	// read-only device
++	// read-only device, even for root
+ 	if ((msg->connect.ioflag & _IO_FLAG_WR) != 0) {
+ 		return EROFS;
+ 	}
+ 
+-	g_self->update_snapshot();
+ 	return iofunc_open_default(ctp, msg, static_cast<iofunc_attr_t *>(handle), extra);
+ }
+ 
++state_ocb_t *QnxStateResmgr::ocb_calloc(resmgr_context_t *ctp, iofunc_attr_t *attr)
++{
++	state_ocb_t *ocb = static_cast<state_ocb_t *>(calloc(1, sizeof(state_ocb_t)));
++
++	if (ocb != nullptr) {
++		ocb->len = g_self->format_state(ocb->text, sizeof(ocb->text));
++	}
++
++	return ocb;
++}
++
++void QnxStateResmgr::ocb_free(state_ocb_t *ocb)
++{
++	free(ocb);
++}
++
+ int QnxStateResmgr::io_read(resmgr_context_t *ctp, io_read_t *msg, RESMGR_OCB_T *ocb_handle)
+ {
+-	iofunc_ocb_t *ocb = static_cast<iofunc_ocb_t *>(ocb_handle);
+-	int status = iofunc_read_verify(ctp, msg, ocb, nullptr);
++	state_ocb_t *ocb = static_cast<state_ocb_t *>(ocb_handle);
++	int status = iofunc_read_verify(ctp, msg, &ocb->hdr, nullptr);
+ 
+ 	if (status != EOK) {
+ 		return status;
+@@ -150,17 +179,16 @@ int QnxStateResmgr::io_read(resmgr_context_t *ctp, io_read_t *msg, RESMGR_OCB_T
+ 		return ENOSYS;
+ 	}
+ 
+-	const size_t len = g_self->_snapshot_len;
+-	const size_t offset = (size_t)ocb->offset;
++	const size_t offset = (size_t)ocb->hdr.offset;
+ 	size_t nbytes = 0;
+ 
+-	if (offset < len) {
+-		nbytes = math::min(len - offset, (size_t)msg->i.nbytes);
++	if (offset < ocb->len) {
++		nbytes = math::min(ocb->len - offset, (size_t)msg->i.nbytes);
+ 	}
+ 
+ 	if (nbytes > 0) {
+-		SETIOV(ctp->iov, g_self->_snapshot + offset, nbytes);
+-		ocb->offset += nbytes;
++		SETIOV(ctp->iov, ocb->text + offset, nbytes);
++		ocb->hdr.offset += nbytes;
+ 		g_self->_reads++;
+ 	}
+ 
+@@ -172,17 +200,31 @@ void QnxStateResmgr::run()
+ {
+ 	g_self = this;
+ 
+-	dispatch_t *dpp = dispatch_create_channel(-1, DISPATCH_FLAG_NOLOCK);
++	// Fixed priority: don't let a high-priority client lift this thread.
++	const int chid = ChannelCreate(_NTO_CHF_FIXED_PRIORITY | _NTO_CHF_DISCONNECT | _NTO_CHF_UNBLOCK);
++
++	if (chid == -1) {
++		PX4_ERR("ChannelCreate failed: %s", strerror(errno));
++		return;
++	}
++
++	dispatch_t *dpp = dispatch_create_channel(chid, DISPATCH_FLAG_NOLOCK);
+ 
+ 	if (dpp == nullptr) {
+ 		PX4_ERR("dispatch_create_channel failed: %s", strerror(errno));
++		ChannelDestroy(chid);
+ 		return;
+ 	}
+ 
+ 	iofunc_func_init(_RESMGR_CONNECT_NFUNCS, &_connect_funcs, _RESMGR_IO_NFUNCS, &_io_funcs);
+ 	_connect_funcs.open = io_open;
+ 	_io_funcs.read = io_read;
++	_ocb_funcs.nfuncs = _IOFUNC_NFUNCS;
++	_ocb_funcs.ocb_calloc = ocb_calloc;
++	_ocb_funcs.ocb_free = ocb_free;
++	_mount.funcs = &_ocb_funcs;
+ 	iofunc_attr_init(&_attr, S_IFCHR | 0444, nullptr, nullptr);
++	_attr.mount = &_mount;
+ 
+ 	resmgr_attr_t rattr{};
+ 	rattr.nparts_max = 1;
+@@ -196,7 +238,7 @@ void QnxStateResmgr::run()
+ 		return;
+ 	}
+ 
+-	PX4_INFO("serving vehicle state at %s", kPath);
++	PX4_INFO("serving vehicle state at %s (fixed priority %d)", kPath, SCHED_PRIORITY_DEFAULT - 30);
+ 
+ 	// Wake up every 500 ms so should_exit() is checked even with no readers.
+ 	struct timespec timeout {0, 500 * 1000 * 1000};
+@@ -233,7 +275,7 @@ int QnxStateResmgr::task_spawn(int argc, char *argv[])
+ 	_task_id = px4_task_spawn_cmd("qnx_state_resmgr",
+ 				      SCHED_DEFAULT,
+ 				      SCHED_PRIORITY_DEFAULT - 30,
+-				      2048,
++				      PX4_STACK_ADJUSTED(4096),
+ 				      (px4_main_t)&run_trampoline,
+ 				      (char *const *)argv);
+ 

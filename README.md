@@ -29,7 +29,7 @@ scripts/px4-vm.sh start        # PX4 SIH quad, MAVLink to the host at 10.0.2.2
 scripts/vm-ssh.sh cat /dev/px4/state   # live state from PX4's QNX resource manager
 ```
 
-QGroundControl on the host picks up the vehicle on UDP 14550. MAVSDK uses UDP 14540.
+MAVLink goes to the host: GCS link on UDP 14550 (QGroundControl), offboard link on UDP 14540 (MAVSDK, used by the tests). The automated tests cover 14540. QGroundControl on 14550 still needs a manual check.
 
 ## Tests
 
@@ -41,15 +41,15 @@ tests/run-all.sh
 |---|---|
 | `tests/test_boot.sh` | 20 SIH-flight modules running, rate/attitude/EKF loops > 100 Hz, `ver` reports QNX |
 | `tests/test_priorities.sh` | every PX4 thread at priority 1..253, `wq:rate_ctrl` highest, work queues `SCHED_FIFO` and ordered |
-| `tests/test_hrt.sh` | `hrt_absolute_time()` vs `CLOCK_MONOTONIC` over 11 s: no backward steps, drift < 1 ms |
+| `tests/test_hrt.sh` | `hrt_absolute_time()` vs `CLOCK_MONOTONIC` over about 12 s: no backward steps, drift < 1 ms (consistency check) |
 | `tests/test_params_persist.sh` | a parameter survives a PX4 restart |
-| `tests/test_resmgr.sh` | `cat /dev/px4/state` (QNX resource manager in PX4): fields, live, read-only, low priority |
+| `tests/test_resmgr.sh` | `cat /dev/px4/state` (QNX resource manager in PX4): fields, live, read-only, server stays at fixed low priority even for a FIFO-200 reader |
 | `tests/test_fault_isolation.sh` | mid-mission, a separate process hogs CPU + 512 MiB and segfaults, PX4 logger restarted: mission completes, PX4 untouched, core file written |
 | `tests/test_flight.py` | MAVSDK: arm, takeoff 10 m, 10 s hold within ±1 m, 4-waypoint mission, land, disarm. Also passes on Linux SITL. |
 
 ## Results
 
-See [docs/results.md](docs/results.md). Short version: with 2x-oversubscribed CPU load, stock Linux SITL lost 23% of rate-controller updates and had a 21 ms gap. On QNX the 800 Hz rate loop did not change, even with the load at FIFO priority 200, because PX4's control threads hold priorities 239 to 253.
+See [docs/results.md](docs/results.md). Short version: with 2x-oversubscribed CPU load, stock Linux SITL (run as a normal user, so without real-time priorities; RT Linux not measured) lost 23% of rate-controller updates and had a 21 ms gap. On QNX the 800 Hz rate loop did not change. With the load at FIFO priority 200 the rate, attitude and EKF loops (239–253) were still unaffected, while lower-priority PX4 tasks (commander, navigator, MAVLink) were starved, exactly as strict priorities dictate.
 
 ![timing](docs/img/timing.png)
 

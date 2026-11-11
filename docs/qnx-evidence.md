@@ -25,7 +25,7 @@ For the "main technology" field of the submission. Every item links to the file 
 | What | Where | Proof |
 |---|---|---|
 | Resource manager: `dispatch_create_channel`, `resmgr_attach`, `iofunc_*`, `dispatch_block/handler` | `src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp` (patch 0005) | `cat /dev/px4/state`, `tests/test_resmgr.sh` |
-| Priority inheritance through message passing (server runs at client priority) | same | `tests/test_resmgr.sh` (thread prio 10 for a prio-10 reader, 60 for `on -p 60 cat`) |
+| Fixed-priority channel (`ChannelCreate(_NTO_CHF_FIXED_PRIORITY)`) to opt out of message-passing priority inheritance | same | `tests/test_resmgr.sh`: server stays at 97 after a FIFO-200 reader |
 | POSIX `statvfs`, `fstatat` in place of Linux-only `statfs`, `d_type` | `px4_platform_common/statfs.h`, `dirent.h` (patch 0002) | logger free-space check, MAVLink FTP |
 | `times()`, `sysconf(_SC_PHYS_PAGES/_SC_AVPHYS_PAGES)` for CPU/RAM load | `src/modules/load_mon/LoadMon.cpp` (patch 0002) | `listener cpuload` |
 

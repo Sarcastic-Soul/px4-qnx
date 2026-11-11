@@ -1,7 +1,7 @@
 From 11b4a8d30014ce0465cf2862bd0b9c1c2616a546 Mon Sep 17 00:00:00 2001
 From: Sarcastic-Soul <anishisbusy@gmail.com>
 Date: Wed, 11 Nov 2026 05:17:05 +0530
-Subject: [PATCH 5/5] qnx: /dev/px4/state resource manager module
+Subject: [PATCH 5/6] qnx: /dev/px4/state resource manager module
 
 ---
  ROMFS/px4fmu_common/init.d-posix/rcS          |   6 +

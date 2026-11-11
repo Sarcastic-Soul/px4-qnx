@@ -12,10 +12,18 @@ modules=(commander navigator dataman ekf2 sensors simulator_sih
          pwm_out_sim mavlink logger load_mon manual_control rc_update
          battery_simulator)
 
+# A running module answers "status" with its own output and exit 0;
+# a stopped one prints "not running" and exits non-zero.
+# mavlink is special: its status printf()s straight to PX4's stdout (not back
+# to the client), so check for its threads instead.
 missing=()
 for m in "${modules[@]}"; do
-    out="$(px4cmd "$m" status 2>&1 || true)"
-    if echo "$out" | grep -qiE "not running|PX4 server not running|cannot execute|not found"; then
+    if [ "$m" = mavlink ]; then
+        n="$(vm "pidin -p px4 -F '%b %h'" | grep -c 'mavlink_if' || true)"
+        [ "$n" -ge 2 ] || missing+=("$m")
+        continue
+    fi
+    if ! out="$(px4cmd "$m" status 2>&1)" || [ -z "$out" ] || echo "$out" | grep -qiE "not running|cannot execute"; then
         missing+=("$m")
     fi
 done

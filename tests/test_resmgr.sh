@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PX4's QNX resource manager serves live state at /dev/px4/state:
 # plain `cat` works, values change over time, the device is read-only, and
-# the resmgr thread runs below every control-loop thread.
+# the resmgr thread stays below the control loops even for a real-time reader.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -22,10 +22,14 @@ echo "$b" | grep -q "pos_valid=1" || fail "position not valid"
 
 if vm "echo x > /dev/px4/state" 2>/dev/null; then fail "device accepted a write"; fi
 
-prio="$(vm "pidin -p px4 -F '%h|%p'" | awk -F'|' '$1 ~ /qnx_state_resm/ {p=$2; gsub(/[^0-9]/,"",p); print p}')"
+# The channel is fixed-priority: the server thread must not inherit a
+# real-time reader's priority. Read once at FIFO 200 and check.
+prio_of() { vm "pidin -p px4 -F '%h|%p'" | awk -F'|' '$1 ~ /qnx_state_resm/ {p=$2; gsub(/[^0-9]/,"",p); print p}'; }
+prio="$(prio_of)"
 [ -n "$prio" ] || fail "resmgr thread not found"
-# QNX message passing: the server thread runs at its client's priority
-# (here the prio-10 shell), so readers can never push it above the control loops.
+hi="$(vm "on -p 200f sh -c 'cat /dev/px4/state > /dev/null; pidin -p px4 -F %h\|%p'" | awk -F'|' '$1 ~ /qnx_state_resm/ {p=$2; gsub(/[^0-9]/,"",p); print p}')"
+[ -n "$hi" ] || fail "resmgr thread not found after high-priority read"
 [ "$prio" -lt 200 ] || fail "resmgr thread priority $prio is too high"
+[ "$hi" -lt 200 ] || fail "resmgr thread went to priority $hi after a FIFO-200 reader (priority inheritance not disabled)"
 
-pass "/dev/px4/state readable with cat, live (t advanced $(( (tb - ta) / 1000 )) ms), read-only, thread prio $prio"
+pass "/dev/px4/state readable with cat, live (t advanced $(( (tb - ta) / 1000 )) ms), read-only, thread prio $prio (still $hi after a FIFO-200 reader)"

@@ -14,7 +14,7 @@ export TMPDIR="${TMPDIR_QNX:-$HOME/qnx-vm/.tmp}"
 mkdir -p "$TMPDIR"
 
 bash -c "source '$QNX_SDP/qnxsdp-env.sh' >/dev/null; qcc -Vgcc_ntox86_64 -O0 -o '$TMPDIR/badapp' '$REPO_DIR/bench/badapp.c'"
-vm "slay -f -Q badapp 2>/dev/null; mkdir -p $PX4_ROOT/bench && rm -f $PX4_ROOT/bench/badapp /data/var/dumper/badapp.core && cat > $PX4_ROOT/bench/badapp && chmod +x $PX4_ROOT/bench/badapp" < "$TMPDIR/badapp"
+vm "slay -f -Q badapp 2>/dev/null; mkdir -p $PX4_ROOT/bench && rm -f $PX4_ROOT/bench/badapp $PX4_ROOT/bench/badapp.out $PX4_ROOT/bench/badapp_perf.txt /data/var/dumper/badapp.core && cat > $PX4_ROOT/bench/badapp && chmod +x $PX4_ROOT/bench/badapp" < "$TMPDIR/badapp"
 
 ensure_px4
 px4_pid_before="$(vm "pidin -p px4 -F '%a'" | tail -n +2 | head -1 | tr -d ' ')"
@@ -36,7 +36,8 @@ px4cmd perf reset >/dev/null
 # reset + badapp + perf read in one VM command so the counter covers exactly the bad app's lifetime
 VM_TIMEOUT=30 vm "cd $PX4_ROOT/rootfs && ../bin/px4-perf reset > /dev/null
     on -p 10 $PX4_ROOT/bench/badapp 8 512 8 > $PX4_ROOT/bench/badapp.out 2>&1; echo exit=\$? >> $PX4_ROOT/bench/badapp.out
-    ../bin/px4-perf | grep 'mc_rate_control: interval' > $PX4_ROOT/bench/badapp_perf.txt" || true
+    ../bin/px4-perf | grep 'mc_rate_control: interval' > $PX4_ROOT/bench/badapp_perf.txt" ||
+    fail "badapp phase did not complete in the VM"
 vm "cat $PX4_ROOT/bench/badapp.out" | sed 's/^/    /'
 
 info "stopping and restarting the PX4 logger in flight"
@@ -51,7 +52,8 @@ grep "test_flight" "$flight_log" | sed 's/^/    /'
 
 px4_pid_after="$(vm "pidin -p px4 -F '%a'" | tail -n +2 | head -1 | tr -d ' ')"
 core="$(vm "ls /data/var/dumper/ 2>/dev/null" | grep -c badapp || true)"
-logger_ok="$(px4cmd logger status 2>&1 | grep -ci "running\|Full log" || true)"
+# logger status prints "not running" when stopped; require a positive line
+logger_ok="$(px4cmd logger status 2>&1 | grep -vi "not running" | grep -ci "Full log\|Running" || true)"
 
 [ "$flight_rc" -eq 0 ] || fail "flight test failed during the fault"
 [ -n "$px4_pid_after" ] && [ "$px4_pid_after" = "$px4_pid_before" ] || fail "PX4 restarted or died (pid $px4_pid_before -> $px4_pid_after)"
@@ -60,6 +62,8 @@ vm "grep -q 'crashing now' $PX4_ROOT/bench/badapp.out" || fail "badapp did not r
 [ "$logger_ok" -ge 1 ] || fail "logger not running again after restart"
 events="$(echo "$rate_line" | awk '{print $3}')"
 [ -n "$events" ] || fail "no rate controller perf data"
+avg="$(echo "$rate_line" | awk '{gsub(/us/,""); print $5}')"
 [ "$events" -gt 6000 ] || fail "rate controller only ran $events times while badapp ran"
+awk -v a="$avg" 'BEGIN{exit !(a > 1200 && a < 1300)}' || fail "rate controller mean interval $avg us (expected ~1250)"
 
 pass "mission completed while a separate process hogged CPU+RAM and segfaulted, and the logger was restarted; PX4 pid $px4_pid_after unchanged, core file written"

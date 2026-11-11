@@ -201,7 +201,7 @@ HOG_PRIO=200f bench/run_timing_qnx.sh qnx-200   # load at FIFO priority 200
 <pre><code>{&#34;label&#34;: &#34;qnx idle&#34;, &#34;events&#34;: 24098, &#34;avg_us&#34;: 1249.95, &#34;max_us&#34;: 1566, ...}
 {&#34;label&#34;: &#34;qnx hog 8x prio 10&#34;, &#34;events&#34;: 24006, &#34;avg_us&#34;: 1249.95, &#34;max_us&#34;: 1438, ...}
 </code></pre>
-<p>The rate controller stays at about 24000 updates per 30 s (800 Hz) with or without the load. For comparison, <code>bench/run_timing_linux.sh</code> runs the same test against stock Linux SITL on the host. There it dropped to 18577 updates with a 21 ms gap, because unprivileged Linux SITL can&#39;t use real-time priorities.</p>
+<p>The rate controller stays at about 24000 updates per 30 s (800 Hz) with or without the load. For comparison, <code>bench/run_timing_linux.sh</code> runs the same test against stock Linux SITL on the host. There it dropped to 18577 updates with a 21 ms gap. Unprivileged Linux SITL can&#39;t use real-time priorities, so this is not an RT-Linux comparison.</p>
 <p class="image-container"><img alt="Rate controller updates: Linux SITL vs QNX under load" src="img/7f57f941f07877cf.png"></p>
 <p>Try <code>HOG_PRIO=245f</code>. Now the load is <strong>above</strong> the EKF (239), and the script reports <code>ekf2 updates: ... hog 1</code>. Strict priorities do exactly what you set. Choosing them is a design decision.</p>
 
@@ -215,14 +215,15 @@ HOG_PRIO=200f bench/run_timing_qnx.sh qnx-200   # load at FIFO priority 200
 <pre><code>t_us=2112350094 armed=0 nav_state=4 x=-0.08 y=-0.07 alt=-0.29 vx=-0.05 ... battery=1.00
 </code></pre>
 <p>The core of it is a few calls:</p>
-<pre><code language="language-cpp" class="language-cpp">dispatch_t *dpp = dispatch_create_channel(-1, DISPATCH_FLAG_NOLOCK);
+<pre><code language="language-cpp" class="language-cpp">int chid = ChannelCreate(_NTO_CHF_FIXED_PRIORITY | _NTO_CHF_DISCONNECT | _NTO_CHF_UNBLOCK);
+dispatch_t *dpp = dispatch_create_channel(chid, DISPATCH_FLAG_NOLOCK);
 iofunc_func_init(_RESMGR_CONNECT_NFUNCS, &amp;connect_funcs, _RESMGR_IO_NFUNCS, &amp;io_funcs);
-connect_funcs.open = io_open;   // takes a uORB snapshot
-io_funcs.read = io_read;        // returns it as text
+ocb_funcs.ocb_calloc = ocb_calloc;  // each open(): new OCB with a uORB snapshot
+io_funcs.read = io_read;            // returns that OCB&#39;s snapshot as text
 iofunc_attr_init(&amp;attr, S_IFCHR | 0444, nullptr, nullptr);
 resmgr_attach(dpp, &amp;rattr, &#34;/dev/px4/state&#34;, _FTYPE_ANY, 0, &amp;connect_funcs, &amp;io_funcs, &amp;attr);
 </code></pre>
-<p>Positive : QNX message passing runs the server thread at the <strong>client&#39;s</strong> priority. A <code>cat</code> at priority 10 is served at 10, so readers can never disturb the control loops. Check it with <code>pidin -p px4 -F '%h %p' | grep qnx_state</code>.</p>
+<p>Positive : By default, QNX message passing runs the server thread at the <strong>client&#39;s</strong> priority, so a real-time reader would lift it. <code>_NTO_CHF_FIXED_PRIORITY</code> turns that off: the server stays at 97, below every control loop. Check it with <code>on -p 200f cat /dev/px4/state</code> and <code>pidin -p px4 -F '%h %p' | grep qnx_state</code>.</p>
 
 
       </google-codelab-step>
@@ -233,7 +234,7 @@ resmgr_attach(dpp, &amp;rattr, &#34;/dev/px4/state&#34;, _FTYPE_ANY, 0, &amp;con
 <p>During a mission, this starts a separate process that takes 8 threads of CPU and 512 MiB of RAM and then segfaults. It also restarts PX4&#39;s logger in flight:</p>
 <pre><code>badapp: crashing now
 Memory fault (core dumped)
-rate controller while badapp ran: 8470 events, 1249.84us avg
+rate controller while badapp ran: ~8000 events, 1249.8us avg
 [test_flight] PASS
 PASS: mission completed ... PX4 pid unchanged, core file written
 </code></pre>

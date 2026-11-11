@@ -136,9 +136,12 @@ async def run(url, alt, timeout):
         async for p in drone.telemetry.position_velocity_ned():
             samples.append(-p.position.down_m - ground_up)
 
+    await drone.telemetry.set_rate_position_velocity_ned(20.0)
     task = asyncio.create_task(sample())
     await asyncio.sleep(10)
     task.cancel()
+    if not samples:
+        raise AssertionError("no local position samples during the hold")
     lo, hi = min(samples), max(samples)
     log(f"hold: {len(samples)} samples, alt min {lo:.2f} max {hi:.2f}")
     assert len(samples) > 10, "too few altitude samples during hold"

@@ -12,6 +12,9 @@ failed=()
 for t in test_boot.sh test_priorities.sh test_hrt.sh test_params_persist.sh test_resmgr.sh test_fault_isolation.sh; do
     "$DIR/$t" || failed+=("$t")
 done
+# fresh PX4 for the standalone flight test (the fault test flew on the old one)
+"$SCRIPTS/px4-vm.sh" stop >/dev/null
+"$SCRIPTS/px4-vm.sh" start --clean >/dev/null && sleep 10
 timeout 600 "$PY" "$DIR/test_flight.py" || failed+=("test_flight.py")
 
 if [ ${#failed[@]} -gt 0 ]; then

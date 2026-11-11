@@ -1,0 +1,88 @@
+PX4 started in VM (sihsim_quadx, MAVLink partner 10.0.2.2)
+[test_boot.sh] mc_rate_control at 800.0 Hz
+[test_boot.sh] ekf2 at 266.7 Hz
+[test_boot.sh] mc_att_control at 266.7 Hz
+[test_boot.sh] PASS: 20 modules running, control loops active, OS reported as QNX
+      1|px4                 | 10r
+      2|2                   | 10r
+      3|hpwork              |252f
+      4|lpwork              |  1f
+      5|wkr_hrt             |253f
+      6|wq:manager          |253f
+      7|wq:lp_default       |203f
+      8|log_writer_file     | 87f
+      9|dataman             |117f
+     10|sih                 |253f
+     11|wq:hp_default       |235f
+     12|:nav_and_controllers|240f
+     13|wq:rate_ctrl        |253f
+     14|wq:INS0             |239f
+     15|commander           |167f
+     16|navigator           |132f
+     17|qnx_state_resmg     | 97f
+     18|mavlink_if0         |127f
+     19|mavlink_rcv_if0     |173f
+     20|mavlink_if1         |127f
+     21|mavlink_rcv_if1     |173f
+     22|mavlink_if2         |127f
+     23|mavlink_rcv_if2     |173f
+     24|mavlink_if3         |127f
+     25|mavlink_rcv_if3     |173f
+     26|mavlink_if4         |127f
+     27|mavlink_rcv_if4     |173f
+     28|logger              |228f
+[test_priorities.sh] PASS: all 28 threads in 1..253, rate_ctrl at 253 (highest), work queues SCHED_FIFO and ordered
+[test_hrt.sh] offset (monotonic - px4) start 5 us, end -5 us, worst read bracket 145 us, window 12005 ms
+[test_hrt.sh] PASS: hrt monotonic over 25 samples, drift 10 us over 12005 ms (bracket <= 145 us)
+[test_params_persist.sh] MPC_XY_CRUISE was 5.0000, setting 7.25
+[test_params_persist.sh] PASS: MPC_XY_CRUISE kept value 7.2500 across restart
+[test_resmgr.sh] read: t_us=11403487068 armed=0 nav_state=4 x=0.27 y=-0.05 alt=-0.11 vx=-0.02 vy=0.02 vz=0.00 heading_deg=-0.6 pos_valid=1 battery=1.00
+[test_resmgr.sh] PASS: /dev/px4/state readable with cat, live (t advanced 1114 ms), read-only, thread prio 97 (still 97 after a FIFO-200 reader)
+[test_fault_isolation.sh] mission running: starting badapp (8 threads, 512 MiB, crash after 8 s) at priority 10
+    badapp: pid 20594711, 8 busy threads, 512 MiB, crash in 8 s
+    badapp: crashing now
+    Memory fault (core dumped) 
+    exit=139
+[test_fault_isolation.sh] stopping and restarting the PX4 logger in flight
+[test_fault_isolation.sh] rate controller while badapp ran (~8 s, expect ~6400 at 800 Hz): 9226 events, 1249.86us avg, min 317us max 2184us 54.706us rms
+    [test_flight] connecting on udpin://0.0.0.0:14540
+    [test_flight] connected
+    [test_flight] health ok
+    [test_flight] home 47.397741,8.545595
+    [test_flight] ground height in local frame -0.11 m
+    [test_flight] armed
+    [test_flight] takeoff complete, settling 20 s
+    [test_flight] hold: 200 samples, alt min 9.88 max 10.09
+    [test_flight] mission uploaded
+    [test_flight] mission started
+    [test_flight]   mission 0/4
+    [test_flight]   mission 1/4
+    [test_flight]   mission 2/4
+    [test_flight]   mission 3/4
+    [test_flight]   mission 4/4
+    [test_flight] mission finished
+    [test_flight] landed
+    [test_flight] disarmed
+    [test_flight] PASS
+[test_fault_isolation.sh] PASS: mission completed while a separate process hogged CPU+RAM and segfaulted, and the logger was restarted; PX4 pid 18952212 unchanged, core file written
+[test_flight] connecting on udpin://0.0.0.0:14540
+[test_flight] connected
+[test_flight] health ok
+[test_flight] home 47.397746,8.545593
+[test_flight] ground height in local frame -0.09 m
+[test_flight] armed
+[test_flight] takeoff complete, settling 20 s
+[test_flight] hold: 200 samples, alt min 9.89 max 10.05
+[test_flight] mission uploaded
+Received ack for not-existing command: 176! Ignoring... (mavlink_command_sender.cpp:324)
+[test_flight] mission started
+[test_flight]   mission 0/4
+[test_flight]   mission 1/4
+[test_flight]   mission 2/4
+[test_flight]   mission 3/4
+[test_flight]   mission 4/4
+[test_flight] mission finished
+[test_flight] landed
+[test_flight] disarmed
+[test_flight] PASS
+ALL TESTS PASSED
