@@ -11,7 +11,7 @@ Devpost form answers and the checklist of what is left. Copy the text under each
 - [x] Upstream draft PR opened: https://github.com/PX4/PX4-Autopilot/pull/29765
 - [ ] Optional: PR to https://github.com/qnx/codelabs adding `markdown/px4-sih-on-qnx/` (copy of `codelab/px4-sih-on-qnx/`).
 - [x] Demo video (2:21) on YouTube: https://youtu.be/ayAlSFN90dM
-- [ ] **(you)** Fill in the Devpost form with the answers below.
+- [x] Devpost form submitted.
 
 ## Rules check (from hackathon_details.md / rules_full.md)
 
