@@ -6,6 +6,7 @@ PX4 Autopilot ported to QNX 8.0. PX4 builds with `qcc`, runs in a QNX 8.0 QEMU x
 - Target: QNX SDP 8.0.5 (`QNX 8.0.0`), QEMU x86_64 with KVM, 4 vCPU, 2 GB
 - Toolchain: `qcc` / `q++` 12.2.0 (`gcc_ntox86_64`), CMake + Ninja
 - Demo video (2:21): https://youtu.be/ayAlSFN90dM
+- Upstream PR: https://github.com/PX4/PX4-Autopilot/pull/29765
 - This repo holds only our work: `patches/` on top of `v1.17.0`, scripts, tests, benchmarks, docs.
 
 ## Requirements
@@ -65,7 +66,7 @@ Reproduce everything from an empty directory: `scripts/fresh-clone-test.sh`.
 - Project site and codelabs: https://sarcastic-soul.github.io/px4-qnx/ (source `docs/index.html`, codelabs rendered by `codelab/build.sh`)
   - [Write a QNX 8.0 resource manager and control its priority](https://sarcastic-soul.github.io/px4-qnx/codelab-site/qnx-resmgr-priority/) (no PX4 needed; checked by `codelab/qnx-resmgr-priority/run-demo.sh`)
   - [Fly PX4 Autopilot on QNX 8.0 in QEMU](https://sarcastic-soul.github.io/px4-qnx/codelab-site/px4-sih-on-qnx/)
-- Upstream: PR draft in [docs/upstream-pr.md](docs/upstream-pr.md). PR URL: _to be added_
+- Upstream PR (draft, rebased on PX4 `main`): https://github.com/PX4/PX4-Autopilot/pull/29765. Notes in [docs/upstream-pr.md](docs/upstream-pr.md).
 
 ## Known limits
 

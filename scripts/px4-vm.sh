@@ -24,7 +24,7 @@ case "${1:-}" in
 start)
     if running; then echo "PX4 already running"; exit 0; fi
     clean=""
-    [ "${2:-}" = "--clean" ] && clean="rm -rf parameters*.bson dataman log;"
+    [ "${2:-}" = "--clean" ] && clean="rm -rf parameters*.bson dataman log fs;"
     # The QNX sshd sometimes keeps the session open while the background PX4
     # runs, so don't wait on it: launch with -n and a short timeout, then poll.
     VM_TIMEOUT=5 vm -n "mkdir -p $PX4_ROOT/rootfs && cd $PX4_ROOT/rootfs && $clean \

@@ -10,7 +10,7 @@ PX4_ROOT="${PX4_ROOT:-/data/px4}"
 SSH="$REPO_DIR/scripts/vm-ssh.sh"
 PY="${PYTHON:-$WORK_DIR/venv/bin/python}"
 
-remote="$(timeout 30 "$SSH" "ls -t $PX4_ROOT/rootfs/log/*/*.ulg | head -1")"
+remote="$(timeout 30 "$SSH" "ls -t $PX4_ROOT/rootfs/log/*/*.ulg $PX4_ROOT/rootfs/fs/log/*/*.ulg 2>/dev/null | head -1")"
 [ -n "$remote" ] || { echo "no ULog found in VM" >&2; exit 1; }
 mkdir -p "$DEST"
 local_file="$DEST/qnx-$(basename "$(dirname "$remote")")-$(basename "$remote")"

@@ -8,7 +8,7 @@ Devpost form answers and the checklist of what is left. Copy the text under each
 - [x] GitHub Pages from `main` `/docs`. Site: https://sarcastic-soul.github.io/px4-qnx/ (landing page links both codelabs)
 - [x] QGroundControl check: QGC v5.1.5 on the host connected to PX4 on QNX over UDP 14550 with no setup (Ready, 10 sats, battery) and showed the full `tests/test_flight.py` mission. Recorded for the demo video.
 - [ ] **(you)** Upload a QNX ULog to https://logs.px4.io (`scripts/fetch-ulog.sh` prints the file path) and paste the link into `docs/upstream-pr.md`.
-- [ ] **(you)** Open the upstream PR (steps in `docs/upstream-pr.md`) and add its URL to `README.md` and below.
+- [x] Upstream draft PR opened: https://github.com/PX4/PX4-Autopilot/pull/29765
 - [ ] Optional: PR to https://github.com/qnx/codelabs adding `markdown/px4-sih-on-qnx/` (copy of `codelab/px4-sih-on-qnx/`).
 - [x] Demo video (2:21) on YouTube: https://youtu.be/ayAlSFN90dM
 - [ ] **(you)** Fill in the Devpost form with the answers below.
@@ -21,7 +21,7 @@ Devpost form answers and the checklist of what is left. Copy the text under each
 | Open-source license visible in About | `LICENSE` (BSD-3-Clause, same as PX4) | done |
 | Build/run instructions with QNX version, target, toolchain | `README.md` (SDP 8.0.5, QEMU x86_64, qcc 12.2.0) | done |
 | Upstream project URL | `README.md` (PX4/PX4-Autopilot, v1.17.0) | done |
-| Upstream PR URL | `README.md` | **(you)** after opening |
+| Upstream PR URL | https://github.com/PX4/PX4-Autopilot/pull/29765 | done (draft) |
 | Every claim backed by a script | `docs/results.md` cites `bench/` and `tests/` for each number | done |
 | Video under 3 min, public or unlisted, YouTube | https://youtu.be/ayAlSFN90dM | done |
 | Codelab URL | GitHub Pages | done (one URL per form; see note under "Codelab URL") |
@@ -95,7 +95,7 @@ QNX is POSIX enough that a large C++ codebase ports with small `#if` blocks, but
 
 ## What's next
 
-Open the upstream PR to PX4, add uXRCE-DDS for ROS 2, and try real hardware on a Raspberry Pi 5 running QNX 8.0.
+Get the upstream PR to PX4 reviewed and merged (https://github.com/PX4/PX4-Autopilot/pull/29765, draft), add uXRCE-DDS for ROS 2, and try real hardware on a Raspberry Pi 5 running QNX 8.0.
 ```
 
 ### Built with
@@ -106,7 +106,7 @@ qnx, qnx-sdp-8.0, qcc, mkqnximage, qemu, kvm, px4, c++, c, cmake, ninja, python,
 
 - https://github.com/Sarcastic-Soul/px4-qnx
 - https://sarcastic-soul.github.io/px4-qnx/ (project site, both codelabs)
-- **(you)** upstream PR URL once opened
+- https://github.com/PX4/PX4-Autopilot/pull/29765
 
 ### Image gallery (3:2, under 5 MB)
 
@@ -176,7 +176,7 @@ https://github.com/PX4/PX4-Autopilot
 
 Pull request URL:
 
-**(you)** add after opening (see docs/upstream-pr.md)
+https://github.com/PX4/PX4-Autopilot/pull/29765
 
 Codelab URL:
 
