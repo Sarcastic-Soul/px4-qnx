@@ -10,7 +10,7 @@ Devpost form answers and the checklist of what is left. Copy the text under each
 - [ ] **(you)** Upload a QNX ULog to https://logs.px4.io (`scripts/fetch-ulog.sh` prints the file path) and paste the link into `docs/upstream-pr.md`.
 - [ ] **(you)** Open the upstream PR (steps in `docs/upstream-pr.md`) and add its URL to `README.md` and below.
 - [ ] Optional: PR to https://github.com/qnx/codelabs adding `markdown/px4-sih-on-qnx/` (copy of `codelab/px4-sih-on-qnx/`).
-- [ ] **(you)** Record the video (`docs/video-script.md`), upload to YouTube as public or unlisted, under 3:00.
+- [x] Demo video (2:21) on YouTube: https://youtu.be/ayAlSFN90dM
 - [ ] **(you)** Fill in the Devpost form with the answers below.
 
 ## Rules check (from hackathon_details.md / rules_full.md)
@@ -23,7 +23,7 @@ Devpost form answers and the checklist of what is left. Copy the text under each
 | Upstream project URL | `README.md` (PX4/PX4-Autopilot, v1.17.0) | done |
 | Upstream PR URL | `README.md` | **(you)** after opening |
 | Every claim backed by a script | `docs/results.md` cites `bench/` and `tests/` for each number | done |
-| Video under 3 min, public or unlisted, YouTube | | **(you)** |
+| Video under 3 min, public or unlisted, YouTube | https://youtu.be/ayAlSFN90dM | done |
 | Codelab URL | GitHub Pages | done (one URL per form; see note under "Codelab URL") |
 
 ---
@@ -115,7 +115,7 @@ qnx, qnx-sdp-8.0, qcc, mkqnximage, qemu, kvm, px4, c++, c, cmake, ninja, python,
 
 ### Demo video URL
 
-**(you)** YouTube link
+https://youtu.be/ayAlSFN90dM
 
 ---
 

@@ -5,6 +5,7 @@ PX4 Autopilot ported to QNX 8.0. PX4 builds with `qcc`, runs in a QNX 8.0 QEMU x
 - Upstream: https://github.com/PX4/PX4-Autopilot, tag `v1.17.0` (BSD-3-Clause)
 - Target: QNX SDP 8.0.5 (`QNX 8.0.0`), QEMU x86_64 with KVM, 4 vCPU, 2 GB
 - Toolchain: `qcc` / `q++` 12.2.0 (`gcc_ntox86_64`), CMake + Ninja
+- Demo video (2:21): https://youtu.be/ayAlSFN90dM
 - This repo holds only our work: `patches/` on top of `v1.17.0`, scripts, tests, benchmarks, docs.
 
 ## Requirements
