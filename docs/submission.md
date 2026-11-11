@@ -6,7 +6,7 @@ Devpost form answers and the checklist of what is left. Copy the text under each
 
 - [x] Public GitHub repo: https://github.com/Sarcastic-Soul/px4-qnx (BSD-3-Clause shows in About)
 - [x] GitHub Pages from `main` `/docs`. Site: https://sarcastic-soul.github.io/px4-qnx/ (landing page links both codelabs)
-- [ ] **(you)** QGroundControl check by eye: install QGC, `scripts/run-vm.sh && scripts/deploy.sh && scripts/px4-vm.sh start`, vehicle appears on UDP 14550, arm, take off, mission, land.
+- [x] QGroundControl check: QGC v5.1.5 on the host connected to PX4 on QNX over UDP 14550 with no setup (Ready, 10 sats, battery) and showed the full `tests/test_flight.py` mission. Recorded for the demo video.
 - [ ] **(you)** Upload a QNX ULog to https://logs.px4.io (`scripts/fetch-ulog.sh` prints the file path) and paste the link into `docs/upstream-pr.md`.
 - [ ] **(you)** Open the upstream PR (steps in `docs/upstream-pr.md`) and add its URL to `README.md` and below.
 - [ ] Optional: PR to https://github.com/qnx/codelabs adding `markdown/px4-sih-on-qnx/` (copy of `codelab/px4-sih-on-qnx/`).

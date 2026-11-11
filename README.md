@@ -29,7 +29,7 @@ scripts/px4-vm.sh start        # PX4 SIH quad, MAVLink to the host at 10.0.2.2
 scripts/vm-ssh.sh cat /dev/px4/state   # live state from PX4's QNX resource manager
 ```
 
-MAVLink goes to the host: GCS link on UDP 14550 (QGroundControl), offboard link on UDP 14540 (MAVSDK, used by the tests). The automated tests cover 14540. QGroundControl on 14550 still needs a manual check.
+MAVLink goes to the host: GCS link on UDP 14550 (QGroundControl), offboard link on UDP 14540 (MAVSDK, used by the tests). The automated tests cover 14540. QGroundControl v5.1.5 on 14550 was checked by hand: it connects with no setup and shows the test mission.
 
 ## Tests
 
