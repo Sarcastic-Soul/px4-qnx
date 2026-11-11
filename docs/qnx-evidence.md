@@ -26,6 +26,7 @@ For the "main technology" field of the submission. Every item links to the file 
 |---|---|---|
 | Resource manager: `dispatch_create_channel`, `resmgr_attach`, `iofunc_*`, `dispatch_block/handler` | `src/modules/qnx_state_resmgr/qnx_state_resmgr.cpp` (patch 0005) | `cat /dev/px4/state`, `tests/test_resmgr.sh` |
 | Fixed-priority channel (`ChannelCreate(_NTO_CHF_FIXED_PRIORITY)`) to opt out of message-passing priority inheritance | same | `tests/test_resmgr.sh`: server stays at 97 after a FIFO-200 reader |
+| Message-passing priority inheritance, measured both ways (codelab) | `codelab/qnx-resmgr-priority/src/prio_dev.c` | `codelab/qnx-resmgr-priority/run-demo.sh`: 1 kHz loop gap 201.7 ms with inheritance vs 1.4 ms fixed; inversion 5.0 ms vs 1701.7 ms |
 | POSIX `statvfs`, `fstatat` in place of Linux-only `statfs`, `d_type` | `px4_platform_common/statfs.h`, `dirent.h` (patch 0002) | logger free-space check, MAVLink FTP |
 | `times()`, `sysconf(_SC_PHYS_PAGES/_SC_AVPHYS_PAGES)` for CPU/RAM load | `src/modules/load_mon/LoadMon.cpp` (patch 0002) | `listener cpuload` |
 
